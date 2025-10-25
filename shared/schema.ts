@@ -1,0 +1,222 @@
+import { sql } from 'drizzle-orm';
+import {
+  index,
+  integer,
+  jsonb,
+  numeric,
+  pgTable,
+  timestamp,
+  varchar,
+  boolean,
+  real,
+} from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+import { relations } from "drizzle-orm";
+
+// Session storage table (required for Replit Auth)
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// User storage table (required for Replit Auth)
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  mereBalance: numeric("mere_balance", { precision: 20, scale: 8 }).notNull().default("0"),
+  totalMined: numeric("total_mined", { precision: 20, scale: 8 }).notNull().default("0"),
+  referralCode: varchar("referral_code").unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
+
+// Miner types/models available in the shop
+export const minerTypes = pgTable("miner_types", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: varchar("description"),
+  imageUrl: varchar("image_url").notNull(),
+  thRate: real("th_rate").notNull(), // TH/s (hash rate)
+  basePriceUsd: numeric("base_price_usd", { precision: 10, scale: 2 }).notNull(),
+  basePriceMere: numeric("base_price_mere", { precision: 10, scale: 2 }).notNull(),
+  dailyYieldUsd: numeric("daily_yield_usd", { precision: 10, scale: 2 }).notNull(),
+  dailyYieldMere: numeric("daily_yield_mere", { precision: 10, scale: 2 }).notNull(),
+  roiDays: integer("roi_days").notNull(),
+  rarity: varchar("rarity").notNull().default("common"), // common, rare, epic, legendary
+  isAvailable: boolean("is_available").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertMinerTypeSchema = createInsertSchema(minerTypes).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMinerType = z.infer<typeof insertMinerTypeSchema>;
+export type MinerType = typeof minerTypes.$inferSelect;
+
+// User-owned miners
+export const userMiners = pgTable("user_miners", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  minerTypeId: varchar("miner_type_id").notNull().references(() => minerTypes.id),
+  slotPosition: integer("slot_position"), // null if not placed in mining room
+  purchasedAt: timestamp("purchased_at").defaultNow(),
+  isActive: boolean("is_active").notNull().default(true),
+  boostMultiplier: real("boost_multiplier").notNull().default(1.0),
+  lastEarningsUpdate: timestamp("last_earnings_update").defaultNow(),
+});
+
+export const userMinersRelations = relations(userMiners, ({ one }) => ({
+  user: one(users, {
+    fields: [userMiners.userId],
+    references: [users.id],
+  }),
+  minerType: one(minerTypes, {
+    fields: [userMiners.minerTypeId],
+    references: [minerTypes.id],
+  }),
+}));
+
+export const insertUserMinerSchema = createInsertSchema(userMiners).omit({
+  id: true,
+  purchasedAt: true,
+  lastEarningsUpdate: true,
+});
+
+export type InsertUserMiner = z.infer<typeof insertUserMinerSchema>;
+export type UserMiner = typeof userMiners.$inferSelect;
+
+// Transaction history
+export const transactions = pgTable("transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type").notNull(), // deposit, withdrawal, purchase, earnings, reward
+  amountMere: numeric("amount_mere", { precision: 20, scale: 8 }).notNull(),
+  amountUsd: numeric("amount_usd", { precision: 20, scale: 2 }),
+  description: varchar("description"),
+  status: varchar("status").notNull().default("completed"), // pending, completed, failed
+  txHash: varchar("tx_hash"), // For blockchain transactions
+  metadata: jsonb("metadata"), // Store additional data like miner_id, etc
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const transactionsRelations = relations(transactions, ({ one }) => ({
+  user: one(users, {
+    fields: [transactions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const insertTransactionSchema = createInsertSchema(transactions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type Transaction = typeof transactions.$inferSelect;
+
+// Seasons for leaderboard
+export const seasons = pgTable("seasons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertSeasonSchema = createInsertSchema(seasons).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSeason = z.infer<typeof insertSeasonSchema>;
+export type Season = typeof seasons.$inferSelect;
+
+// Leaderboard entries
+export const leaderboardEntries = pgTable("leaderboard_entries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  seasonId: varchar("season_id").notNull().references(() => seasons.id, { onDelete: "cascade" }),
+  totalMined: numeric("total_mined", { precision: 20, scale: 8 }).notNull().default("0"),
+  totalHashrate: real("total_hashrate").notNull().default(0),
+  rank: integer("rank"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const leaderboardEntriesRelations = relations(leaderboardEntries, ({ one }) => ({
+  user: one(users, {
+    fields: [leaderboardEntries.userId],
+    references: [users.id],
+  }),
+  season: one(seasons, {
+    fields: [leaderboardEntries.seasonId],
+    references: [seasons.id],
+  }),
+}));
+
+export const insertLeaderboardEntrySchema = createInsertSchema(leaderboardEntries).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertLeaderboardEntry = z.infer<typeof insertLeaderboardEntrySchema>;
+export type LeaderboardEntry = typeof leaderboardEntries.$inferSelect;
+
+// Season pass rewards
+export const seasonPassRewards = pgTable("season_pass_rewards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  seasonId: varchar("season_id").notNull().references(() => seasons.id, { onDelete: "cascade" }),
+  tier: integer("tier").notNull(), // 0-based index
+  isPremium: boolean("is_premium").notNull().default(false),
+  rewardType: varchar("reward_type").notNull(), // mere, miner, booster, skin
+  rewardValue: numeric("reward_value", { precision: 20, scale: 8 }),
+  rewardMetadata: jsonb("reward_metadata"), // Store additional reward data
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const seasonPassRewardsRelations = relations(seasonPassRewards, ({ one }) => ({
+  season: one(seasons, {
+    fields: [seasonPassRewards.seasonId],
+    references: [seasons.id],
+  }),
+}));
+
+export type SeasonPassReward = typeof seasonPassRewards.$inferSelect;
+
+// User season pass progress
+export const userSeasonPass = pgTable("user_season_pass", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  seasonId: varchar("season_id").notNull().references(() => seasons.id, { onDelete: "cascade" }),
+  currentTier: integer("current_tier").notNull().default(0),
+  hasPremium: boolean("has_premium").notNull().default(false),
+  claimedRewards: jsonb("claimed_rewards").notNull().default("[]"), // Array of reward IDs
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const userSeasonPassRelations = relations(userSeasonPass, ({ one }) => ({
+  user: one(users, {
+    fields: [userSeasonPass.userId],
+    references: [users.id],
+  }),
+  season: one(seasons, {
+    fields: [userSeasonPass.seasonId],
+    references: [seasons.id],
+  }),
+}));
+
+export type UserSeasonPass = typeof userSeasonPass.$inferSelect;
