@@ -1,0 +1,152 @@
+build a complete mobile crypto-mining game app called MereMiners
+
+Short brief (one sentence):
+Build a premium, highly polished, black-and-gold themed mobile-first crypto mining game called MereMiners. Users deposit USDT (TRC-20), automatically convert to MERE (fixed price $0.50), buy miners with MERE, place miners into mining room slots to generate hashed revenue; include leaderboard, season pass, marketplace, mini-games, events, profile, wallet, and visually stunning UX with toy-like 3D miners and smooth animations.
+
+⸻
+
+Core tokenomics & economics (hard requirements)
+	•	Fiat/Stablecoin accepted: USDT (TRC-20) only for deposits and withdrawals. No other on-ramps.
+	•	In-app currency: MERE token — fixed price = $0.50 USD per MERE (for all in-app conversions and shop prices).
+	•	Conversion: MERE_received = (USDT_amount) / 0.5 (example: 10 USDT → 20 MERE).
+	•	Miner product specifics:
+	•	1 TH/s miner costs $13.99 (price shown in MERE: 13.99 / 0.5 = 27.98 MERE).
+	•	Yield: each 1 TH/s miner generates $0.08 per day (equivalently 0.16 MERE/day at fixed price).
+	•	ROI example: 13.99 / 0.08 ≈ 174.9 days (automatically calculated in UI). Show ROI in days and % APR on miner card.
+	•	Scaling & discounts: the more hash rate bought in a single purchase, the small discount applies following a configurable formula:
+	•	Discount formula (example, adjustable): discount_pct = min(20, 5 * log10(total_THpurchased + 1)) — yields small discounts for larger bulk buys, up to 20%. Include UI showing the discount slider and final price in MERE.
+	•	All store purchases must be in MERE. (Shop, boosters, skins, season pass, slots, upgrades.)
+
+⸻
+
+Wallet & payments
+	•	Custody model: server-side custodial wallet that supports TRON TRC-20 USDT deposits/withdrawals. (Clearly label custodial model in docs; implement KYC later if required.)
+	•	Deposits: users deposit USDT(TRC-20) to a unique TRON address per user / per deposit session. Backend watches mempool/confirmations and credits USD value to user balance, then converts to MERE at fixed rate and shows MERE balance.
+	•	Withdrawals: allow withdrawals in USDT(TRC-20) only, from MERE → USDT conversion at $0.50 fixed, minus withdrawal fee configurable (show fee before confirmation).
+	•	Security: HSM or secure key store for private keys, rate limits, withdrawal whitelisting, 2FA for withdrawal, IP/device verification, TX replay protection. Log all deposit/withdrawal events.
+
+⸻
+
+Core features & UX flows
+	1.	Onboarding
+	•	Fast sign-up (email/phone + password). Progressive request for KYC only when user tries to withdraw beyond threshold.
+	•	Tutorial/first-time flow that explains USDT(TRC-20) deposit → MERE conversion → buying miners → placing miners into slots.
+	2.	Dashboard / Mining Room
+	•	Visual “Mining Room” (3D-ish tiles / racks) with slots where users place miners. Each slot shows miner art, TH/s, daily yield (MERE/day and $/day), uptime, and cooldown.
+	•	Aggregate stats: total hash power, total daily earnings ($ and MERE), balance, active miners count, uptime %.
+	•	Each miner contributes hashed power; total mining rate = sum(TH/s). Display generation percent bars and live incremental earnings (smooth animation).
+	3.	Shop / Marketplace
+	•	Shop sells standard miners, miner boosters (temporary % increase), slot expansions, miner skins — all priced in MERE.
+	•	Marketplace (P2P) optionally: users list miners or items for sale for MERE, with automatic escrow until buyer confirms or on purchase instant settlement (depends on scope). Include fees for marketplace transactions.
+	4.	Leaderboard
+	•	Seasonal leaderboards (season length configurable). Ranks by total MERE mined, total TH/s, or events score. Top users get season rewards paid in MERE or exclusive NFTs/skins.
+	5.	Season Pass
+	•	Tiered season pass purchasable in MERE. Offers track with free and premium lanes. Premium grants exclusive miners, skins, boosts, and MERE rewards.
+	6.	Mini-games & Events
+	•	Add small arcade-style mini-games (e.g., “Hash Rush” or clicker, puzzle) that award MERE, boosters, or XP.
+	•	Time-limited events with special miners or boosted yields.
+	7.	Profile
+	•	Show stats, achievements, social handle, referral code, season progress, and ability to link/display TRON address (read-only).
+	8.	Wallet screen
+	•	MERE balance, USDT equivalent value, deposit/withdraw buttons, transaction history (deposits, withdrawals, purchases, marketplace trades, earnings).
+	•	Deposit flow: shows unique TRC-20 address & QR, required confirmations count, exchange rate, final MERE credited.
+	•	Withdraw flow: asks amount in MERE or USDT, shows fee and estimated processing time.
+	9.	Notifications & Social
+	•	Push notifications for events, withdrawals processed, leaderboard rank changes, and special sales. Optional in-app chat/comments on marketplace listings.
+
+⸻
+
+UI / Visual & Interaction direction (must be black & gold, premium)
+	•	Theme: deep matte black backgrounds, layered surfaces, brushed gold accents (not garish), glossy metallic highlights, dramatic lighting — “black gold luxury + toy-like playful miners”.
+	•	Style: 3D soft-toy miner models, rounded UI cards, rich depth shadows, neon rim lighting in gold/orange gradients.
+	•	Microinteractions: smooth spring animations on purchases, particle effects when earning MERE, subtle camera parallax in the mining room, hover/focus glows.
+	•	Typography: modern geometric sans (e.g., Inter / Poppins) for body, display serif or semi-serif for headings if desired for premium feel.
+	•	Color palette: #0B0B0D (very dark), #111111, Gold: #D4AF37 (primary accent), highlight gradient: #FFD86B → #FF9F1C; subtle neon orange for earnings popouts.
+	•	Sound: subtle metallic chimes for purchases, soft hum for mining room — optional toggle off.
+
+⸻
+
+Visual assets & animations to request
+	•	3–5 variants of 3D miner models (toy-like), each with several skin options (metal, matte, neon).
+	•	Miner animation loop (idle), purchase animation, placement animation, and level-up glow.
+	•	Particle assets for earning animation (tiny gold sparks).
+	•	UI kit: cards, buttons, sliders, modals, toasts, progress bars, season pass track UI, and leaderboard rows.
+	•	App icon (black background, big gold “M” emblem).
+
+⸻
+
+Backend architecture (high level)
+	•	API: Node.js/Express or Python/FastAPI. Auth with JWT + refresh tokens. Role-based access for admin endpoints.
+	•	Database: PostgreSQL for relational data (users, miners, transactions, marketplace listings). Redis for caching and real-time counters.
+	•	Blockchain node: TRON full node / TronGrid or trusted TRC-20 provider for watching deposit addresses and sending withdrawals. Use webhook/notifications for confirmed TXs.
+	•	Worker queue: background workers (Bull / Celery) to process deposits, credit MERE, process scheduled earnings, handle withdrawals.
+	•	Earnings engine: periodic cron (every minute or configurable) to compute mined amounts per user based on placed miners, active time, and boosters. Ensure idempotency and safety.
+	•	Admin panel: manual controls for tokenomics tweaks (discount formula, miner prices), freeze accounts, event creation, and viewing financial reports.
+
+⸻
+
+API & DB examples (include sample endpoints)
+
+Endpoints (examples):
+	•	POST /api/auth/signup — sign up
+	•	POST /api/auth/login — login
+	•	GET /api/profile — user profile & stats
+	•	POST /api/wallet/deposit/address — generate deposit address (TRC-20)
+	•	GET /api/wallet/txs — transaction history
+	•	POST /api/shop/buy — buy miner/item with MERE
+	•	GET /api/mining/room — user slots & placed miners
+	•	POST /api/mining/place — place miner into slot
+	•	POST /api/withdraw — withdraw USDT(TRC-20)
+	•	GET /api/leaderboard?season=2025-10 — leaderboard
+	•	POST /api/marketplace/list — list item for sale
+
+DB schema snippets (simplified):
+	•	users(id, email, password_hash, mera_balance, created_at, kyc_status, tron_deposit_address)
+	•	miners(id, model, th_rate, base_price_usd, base_price_mere, boost_pct)
+	•	user_miners(id, user_id, miner_id, placed_slot, bought_at, status)
+	•	transactions(id, user_id, type, amount_mere, usd_value, tx_hash, status)
+	•	seasons(id, start_at, end_at, name)
+	•	leaderboard_entries(user_id, season_id, metric_value)
+
+⸻
+
+Real-time & earnings calculation (precise)
+	•	Calculation per miner: daily_usd = per_TH_daily_rate * TH where specified 1 TH → $0.08/day. So per_TH_daily_rate = 0.08 USD.
+	•	Convert to MERE: daily_mere = daily_usd / 0.5 = 0.16 MERE per 1 TH/s per day.
+	•	Earnings engine runs every minute and credits fractional MERE to user earnings: minute_earn = (daily_mere / 24 / 60) * active_TH. Use fixed-point arithmetic to avoid float drift.
+
+⸻
+
+Admin & analytics
+	•	Track economic KPIs: total USDT inflow/outflow, MERE minted/burned, total TH/s supplied, top sellers, churn.
+	•	A/B test miner prices, discount curves, and event reward amounts.
+	•	Fraud detection: unusual deposit/withdrawal patterns, wash trading in marketplace.
+
+⸻
+
+Compliance & risk notes (to include in dev brief)
+	•	Regulatory: check local laws where app operates; KYC/AML recommended for withdrawal thresholds.
+	•	Security: audited TRC-20 interactions, secure key management, penetration testing.
+	•	Financial disclaimers: show that MERE is an in-app currency pegged at $0.50 for the platform; show risk disclaimers.
+
+⸻
+
+Deliverables & acceptance criteria
+	•	Fully functional prototype deployable on Replit for frontend/backend as a PWA, including deposit flow simulation (use test TRC-20 node or TronGrid testnet for testing).
+	•	Mobile-optimized UI that looks and animates like a native app.
+	•	Back end that supports real USDT(TRC-20) deposit watch and crediting (or a mocked/test mode).
+	•	Complete documentation: deployment instructions, API spec, DB schema, admin guide.
+	•	Assets: 3D miner models, UI kit, icon pack, demo user flows recorded as short videos/gifs.
+
+⸻
+
+Copy / microcopy examples to include in the build
+	•	Deposit page header: “Deposit USDT (TRC-20) — convert instantly to MERE (1 MERE = $0.50).”
+	•	Purchase confirmation: “You will spend 27.98 MERE (≈ $13.99). Expected daily earnings: 0.16 MERE / $0.08. ROI: ~175 days.”
+	•	Withdrawal modal: show MERE → USDT conversion & fee before confirming.
+
+⸻
+
+Creative brief / design prompt (for UI designers or image AIs)
+
+“Design a premium mobile PWA interface for MereMiners — black matte surfaces with layered gold accents, toy-style 3D miners on glossy racks, smooth parallax in the mining room, animated particle effects when earnings count up. Emphasize delight and clarity: clear earnings, bold purchase CTA, elegant season pass track, leaderboard cards with gold borders. Deliver screens: onboarding, dashboard/mining room, shop, marketplace, wallet deposit/withdraw, leaderboard, season pass, mini-game launcher
