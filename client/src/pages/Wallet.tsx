@@ -193,49 +193,67 @@ export default function Wallet() {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
-        {/* Balance Card */}
-        <Card className="p-6 border-primary/30 bg-gradient-to-br from-card to-accent/20">
-          <div className="text-center space-y-4">
-            <div>
-              <div className="text-sm text-muted-foreground mb-2">MERE Balance</div>
-              <div className="text-5xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent" data-testid="text-mere-balance">
+        {/* Balance Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* MERE Balance Card */}
+          <Card className="p-6 border-primary/30 bg-gradient-to-br from-card to-accent/20">
+            <div className="text-center space-y-2">
+              <div className="text-sm text-muted-foreground">MERE Balance</div>
+              <div className="text-4xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent" data-testid="text-mere-balance">
                 {formatMERE(mereBalance)}
               </div>
-              <div className="text-muted-foreground mt-2">
-                ≈ {formatUSD(usdBalance)} (1 MERE = {formatUSD(MERE_TO_USD_RATE)})
-              </div>
+              <div className="text-xs text-muted-foreground">MERE</div>
             </div>
+          </Card>
 
-            <div className="flex gap-2 justify-center flex-wrap">
-              <Button
-                onClick={handleDeposit}
-                className="flex-1 min-w-[140px] bg-gold-gradient text-black font-bold"
-                data-testid="button-deposit"
-              >
-                <ArrowDownToLine className="w-4 h-4 mr-2" />
-                Deposit
-              </Button>
-              <Button
-                onClick={() => setShowWithdraw(true)}
-                variant="outline"
-                className="flex-1 min-w-[140px]"
-                data-testid="button-withdraw"
-              >
-                <ArrowUpFromLine className="w-4 h-4 mr-2" />
-                Withdraw
-              </Button>
-              <Button
-                onClick={() => setShowConvert(true)}
-                variant="secondary"
-                className="flex-1 min-w-[140px]"
-                data-testid="button-convert"
-              >
-                <ArrowLeftRight className="w-4 h-4 mr-2" />
-                Convert
-              </Button>
+          {/* USDT Balance Card */}
+          <Card className="p-6 border-primary/30 bg-gradient-to-br from-card to-accent/20">
+            <div className="text-center space-y-2">
+              <div className="text-sm text-muted-foreground">USDT Balance</div>
+              <div className="text-4xl font-display font-bold text-primary" data-testid="text-usdt-balance">
+                {usdBalance.toFixed(2)}
+              </div>
+              <div className="text-xs text-muted-foreground">USDT</div>
             </div>
+          </Card>
+        </div>
+
+        {/* Exchange Rate Info */}
+        <Card className="p-4 bg-accent/10 border-primary/10">
+          <div className="text-center text-sm text-muted-foreground">
+            Exchange Rate: <span className="text-foreground font-semibold">1 MERE = 0.50 USDT</span>
           </div>
         </Card>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 justify-center flex-wrap">
+          <Button
+            onClick={handleDeposit}
+            className="flex-1 min-w-[140px] bg-gold-gradient text-black font-bold"
+            data-testid="button-deposit"
+          >
+            <ArrowDownToLine className="w-4 h-4 mr-2" />
+            Deposit
+          </Button>
+          <Button
+            onClick={() => setShowWithdraw(true)}
+            variant="outline"
+            className="flex-1 min-w-[140px]"
+            data-testid="button-withdraw"
+          >
+            <ArrowUpFromLine className="w-4 h-4 mr-2" />
+            Withdraw
+          </Button>
+          <Button
+            onClick={() => setShowConvert(true)}
+            variant="secondary"
+            className="flex-1 min-w-[140px]"
+            data-testid="button-convert"
+          >
+            <ArrowLeftRight className="w-4 h-4 mr-2" />
+            Convert
+          </Button>
+        </div>
 
         {/* Transaction History */}
         <div>
@@ -276,7 +294,7 @@ export default function Wallet() {
                       </div>
                       {tx.amountUsd && (
                         <div className="text-sm text-muted-foreground">
-                          {formatUSD(tx.amountUsd)}
+                          {parseFloat(tx.amountUsd).toFixed(2)} USDT
                         </div>
                       )}
                       <div className="text-xs">
@@ -313,7 +331,7 @@ export default function Wallet() {
                 <strong>Important:</strong> Only send USDT (TRC-20) to this address. Other tokens will be lost.
               </div>
               <div className="text-sm text-muted-foreground">
-                <strong>Exchange Rate:</strong> 1 USDT = 2 MERE (1 MERE = $0.50)
+                <strong>Exchange Rate:</strong> 1 USDT = 2 MERE (1 MERE = 0.50 USDT)
               </div>
             </Card>
 
@@ -414,7 +432,7 @@ export default function Wallet() {
                   <div className="text-right">
                     <div className="font-bold">{formatMERE(withdrawTotal)} MERE</div>
                     <div className="text-xs text-muted-foreground">
-                      ≈ {formatUSD(mereToUSD(withdrawTotal))} USDT
+                      ≈ {mereToUSD(withdrawTotal).toFixed(2)} USDT
                     </div>
                   </div>
                 </div>
@@ -483,13 +501,13 @@ export default function Wallet() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Exchange Rate:</span>
-                    <span>1 MERE = $0.50</span>
+                    <span>1 MERE = 0.50 USDT</span>
                   </div>
                   <div className="flex justify-between text-sm pt-2 border-t border-border">
                     <span className="font-semibold">You will receive:</span>
                     <div className="text-right">
                       <div className="font-bold text-primary">
-                        {formatUSD(mereToUSD(parseFloat(convertAmount)))} USDT
+                        {mereToUSD(parseFloat(convertAmount)).toFixed(2)} USDT
                       </div>
                     </div>
                   </div>
@@ -508,7 +526,7 @@ export default function Wallet() {
                   data-testid="input-convert-amount-usdt"
                 />
                 <div className="text-xs text-muted-foreground mt-1">
-                  Available: {formatUSD(usdBalance)} USDT
+                  Available: {usdBalance.toFixed(2)} USDT
                 </div>
               </div>
 
@@ -516,7 +534,7 @@ export default function Wallet() {
                 <Card className="p-4 space-y-2 bg-accent/20">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Convert:</span>
-                    <span>{formatUSD(parseFloat(convertAmount))} USDT</span>
+                    <span>{parseFloat(convertAmount).toFixed(2)} USDT</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Exchange Rate:</span>
@@ -537,7 +555,7 @@ export default function Wallet() {
 
           <Card className="p-4 bg-primary/10">
             <div className="text-sm text-muted-foreground">
-              <strong>Note:</strong> Conversions are instant with no fees. Exchange rate: 1 MERE = $0.50 USDT
+              <strong>Note:</strong> Conversions are instant with no fees. Exchange rate: 1 MERE = 0.50 USDT
             </div>
           </Card>
 
