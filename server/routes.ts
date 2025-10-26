@@ -869,15 +869,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { moves } = req.body;
       
       // Calculate reward based on moves (fewer moves = better reward)
-      // Perfect game (12 moves = 6 pairs) = 10 MERE
-      // Each extra move reduces reward by 0.5 MERE, minimum 1 MERE
+      // Perfect game (12 moves = 6 pairs) = 0.5 MERE
+      // Each extra move reduces reward by 0.01 MERE, minimum 0.01 MERE
       let rewardMere: string;
       if (moves <= 12) {
-        rewardMere = '10.00';
+        rewardMere = '0.50';
       } else {
         const extraMoves = moves - 12;
-        const penalty = extraMoves * 0.5;
-        const reward = Math.max(1, 10 - penalty);
+        const penalty = extraMoves * 0.01;
+        const reward = Math.max(0.01, 0.5 - penalty);
         rewardMere = reward.toFixed(2);
       }
       
