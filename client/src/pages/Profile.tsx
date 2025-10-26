@@ -163,7 +163,7 @@ export default function Profile() {
             <div className="flex-1">
               {!isEditingName ? (
                 <>
-                  <div className="flex items-center justify-between gap-2 mb-1">
+                  <div className="flex items-center justify-between gap-2 mb-3">
                     <h2 className="font-display font-bold text-xl" data-testid="text-user-name">
                       {user?.firstName && user?.lastName
                         ? `${user.firstName} ${user.lastName}`
@@ -180,11 +180,6 @@ export default function Profile() {
                       Change Name
                     </Button>
                   </div>
-                  {user?.email && (
-                    <p className="text-sm text-muted-foreground mb-3" data-testid="text-user-email">
-                      {user.email}
-                    </p>
-                  )}
                   <Badge className="bg-primary text-primary-foreground">Active Miner</Badge>
                 </>
               ) : (
