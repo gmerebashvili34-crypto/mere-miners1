@@ -34,6 +34,7 @@ export const users = pgTable("users", {
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   mereBalance: numeric("mere_balance", { precision: 20, scale: 8 }).notNull().default("0"),
+  usdtBalance: numeric("usdt_balance", { precision: 20, scale: 8 }).notNull().default("0"),
   totalMined: numeric("total_mined", { precision: 20, scale: 8 }).notNull().default("0"),
   referralCode: varchar("referral_code").unique(),
   referredById: varchar("referred_by_id").references((): any => users.id), // Who invited this user

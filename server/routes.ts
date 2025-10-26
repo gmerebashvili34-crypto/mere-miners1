@@ -423,21 +423,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         convertedAmount = convertAmount * 0.5;
         description = `Converted ${convertAmount} MERE to ${convertedAmount.toFixed(2)} USDT`;
-        // Balance stays the same (MERE to USDT mock conversion for demo)
+        
+        // Actually deduct MERE and add USDT
+        await db.transaction(async (tx) => {
+          // Deduct MERE (with balance check to prevent negative balance)
+          const result = await tx
+            .update(users)
+            .set({
+              mereBalance: sql`${users.mereBalance} - ${convertAmount}`,
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(users.id, userId),
+              sql`${users.mereBalance} >= ${convertAmount}`
+            ))
+            .returning();
+          
+          if (result.length === 0) {
+            throw new Error("Insufficient MERE balance");
+          }
+          
+          // Add USDT
+          await tx
+            .update(users)
+            .set({
+              usdtBalance: sql`${users.usdtBalance} + ${convertedAmount}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, userId));
+        });
       } else if (fromCurrency === "USDT" && toCurrency === "MERE") {
         // Convert USDT to MERE (1 USDT = 2 MERE)
-        const usdBalance = parseFloat(user.mereBalance) * 0.5;
-        if (usdBalance < convertAmount) {
+        if (parseFloat(user.usdtBalance) < convertAmount) {
           return res.status(400).json({ message: "Insufficient USDT balance" });
         }
         convertedAmount = convertAmount * 2;
         description = `Converted ${convertAmount} USDT to ${convertedAmount.toFixed(2)} MERE`;
-        // Balance stays the same (USDT to MERE mock conversion for demo)
+        
+        // Actually deduct USDT and add MERE
+        await db.transaction(async (tx) => {
+          // Deduct USDT (with balance check to prevent negative balance)
+          const result = await tx
+            .update(users)
+            .set({
+              usdtBalance: sql`${users.usdtBalance} - ${convertAmount}`,
+              updatedAt: new Date(),
+            })
+            .where(and(
+              eq(users.id, userId),
+              sql`${users.usdtBalance} >= ${convertAmount}`
+            ))
+            .returning();
+          
+          if (result.length === 0) {
+            throw new Error("Insufficient USDT balance");
+          }
+          
+          // Add MERE
+          await tx
+            .update(users)
+            .set({
+              mereBalance: sql`${users.mereBalance} + ${convertedAmount}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, userId));
+        });
       } else {
         return res.status(400).json({ message: "Invalid currency pair" });
       }
 
-      // Record transaction (mock - balance doesn't change as this is a conversion)
+      // Record transaction
       await storage.createTransaction({
         userId,
         type: "conversion",

@@ -188,7 +188,7 @@ export default function Wallet() {
   };
 
   const mereBalance = parseFloat(user?.mereBalance || "0");
-  const usdBalance = mereToUSD(mereBalance);
+  const usdtBalance = parseFloat(user?.usdtBalance || "0");
   const withdrawAmountUsdt = parseFloat(withdrawAmount) || 0;
   const withdrawFee = withdrawAmountUsdt * 0.02; // 2% fee
   const withdrawTotal = withdrawAmountUsdt - withdrawFee;
@@ -224,7 +224,7 @@ export default function Wallet() {
             <div className="text-center space-y-2">
               <div className="text-sm text-muted-foreground">USDT Balance</div>
               <div className="text-4xl font-display font-bold text-primary" data-testid="text-usdt-balance">
-                {usdBalance.toFixed(2)}
+                {usdtBalance.toFixed(2)}
               </div>
               <div className="text-xs text-muted-foreground">USDT</div>
             </div>
@@ -438,7 +438,7 @@ export default function Wallet() {
                 data-testid="input-withdraw-amount"
               />
               <div className="text-xs text-muted-foreground mt-1">
-                Available: {usdBalance.toFixed(2)} USDT
+                Available: {usdtBalance.toFixed(2)} USDT
               </div>
             </div>
 
@@ -474,7 +474,7 @@ export default function Wallet() {
             </Button>
             <Button
               onClick={handleWithdraw}
-              disabled={withdrawAmountUsdt <= 0 || withdrawAmountUsdt > usdBalance || !withdrawAddress || withdrawMutation.isPending}
+              disabled={withdrawAmountUsdt <= 0 || withdrawAmountUsdt > usdtBalance || !withdrawAddress || withdrawMutation.isPending}
               className="bg-gold-gradient text-black font-bold"
               data-testid="button-confirm-withdraw"
             >
@@ -548,7 +548,7 @@ export default function Wallet() {
                   data-testid="input-convert-amount-usdt"
                 />
                 <div className="text-xs text-muted-foreground mt-1">
-                  Available: {usdBalance.toFixed(2)} USDT
+                  Available: {usdtBalance.toFixed(2)} USDT
                 </div>
               </div>
 

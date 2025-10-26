@@ -113,11 +113,14 @@ export default function Profile() {
             </Avatar>
             
             <div className="flex-1">
-              <h2 className="font-display font-bold text-xl mb-1" data-testid="text-user-name">
-                {user?.firstName && user?.lastName
-                  ? `${user.firstName} ${user.lastName}`
-                  : user?.firstName || user?.email?.split("@")[0] || "Miner"}
-              </h2>
+              <div className="flex items-center gap-2 mb-1">
+                <h2 className="font-display font-bold text-xl" data-testid="text-user-name">
+                  {user?.firstName && user?.lastName
+                    ? `${user.firstName} ${user.lastName}`
+                    : user?.firstName || user?.email?.split("@")[0] || "Miner"}
+                </h2>
+                <span className="text-xs text-muted-foreground">(Name from Replit)</span>
+              </div>
               {user?.email && (
                 <p className="text-sm text-muted-foreground mb-3" data-testid="text-user-email">
                   {user.email}
@@ -151,7 +154,7 @@ export default function Profile() {
               {formatMERE(totalMined)}
             </div>
             <div className="text-sm text-muted-foreground mt-1">
-              ≈ {formatUSD(mereToUSD(totalMined))}
+              ≈ {mereToUSD(totalMined).toFixed(2)} USDT
             </div>
           </Card>
 
@@ -166,7 +169,7 @@ export default function Profile() {
               {formatMERE(mereBalance)}
             </div>
             <div className="text-sm text-muted-foreground mt-1">
-              ≈ {formatUSD(mereToUSD(mereBalance))}
+              ≈ {mereToUSD(mereBalance).toFixed(2)} USDT
             </div>
           </Card>
         </div>

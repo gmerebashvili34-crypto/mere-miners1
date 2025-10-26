@@ -175,7 +175,7 @@ export function MiningSlot({
               data-testid={`button-remove-miner-${miner.id}`}
             >
               <X className="w-4 h-4" />
-              <span>Remove</span>
+              <span>Unplace</span>
             </Button>
           )}
         </div>

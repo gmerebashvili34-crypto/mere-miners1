@@ -116,15 +116,39 @@ export class EarningsEngine {
               })
               .where(eq(users.id, userId));
 
-            // Create transaction record
-            await tx.insert(transactions).values({
-              userId,
-              type: "earnings",
-              amountMere: roundedEarnings.toString(),
-              amountUsd: (roundedEarnings * 0.5).toFixed(2),
-              description: "Mining earnings",
-              status: "completed",
+            // Create daily transaction record (only one per day)
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            
+            const todayTransaction = await tx.query.transactions.findFirst({
+              where: (txns, { and, eq, gte }) =>
+                and(
+                  eq(txns.userId, userId),
+                  eq(txns.type, "earnings"),
+                  gte(txns.createdAt, today)
+                ),
             });
+
+            if (todayTransaction) {
+              // Update existing daily transaction
+              await tx
+                .update(transactions)
+                .set({
+                  amountMere: sql`${transactions.amountMere} + ${roundedEarnings}`,
+                  amountUsd: sql`${transactions.amountUsd} + ${roundedEarnings * 0.5}`,
+                })
+                .where(eq(transactions.id, todayTransaction.id));
+            } else {
+              // Create new daily transaction
+              await tx.insert(transactions).values({
+                userId,
+                type: "earnings",
+                amountMere: roundedEarnings.toString(),
+                amountUsd: (roundedEarnings * 0.5).toFixed(2),
+                description: "Daily mining earnings",
+                status: "completed",
+              });
+            }
 
             // Update leaderboard
             const activeSeasons = await tx.query.seasons.findFirst({
