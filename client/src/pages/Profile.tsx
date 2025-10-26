@@ -113,13 +113,13 @@ export default function Profile() {
             </Avatar>
             
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center justify-between gap-2 mb-1">
                 <h2 className="font-display font-bold text-xl" data-testid="text-user-name">
                   {user?.firstName && user?.lastName
                     ? `${user.firstName} ${user.lastName}`
                     : user?.firstName || user?.email?.split("@")[0] || "Miner"}
                 </h2>
-                <span className="text-xs text-muted-foreground">(Name from Replit)</span>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">(Name from Replit)</span>
               </div>
               {user?.email && (
                 <p className="text-sm text-muted-foreground mb-3" data-testid="text-user-email">
