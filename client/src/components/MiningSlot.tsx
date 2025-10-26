@@ -110,7 +110,7 @@ export function MiningSlot({
             size="icon"
             variant="ghost"
             onClick={() => setShowRemoveConfirm(true)}
-            className="absolute top-1 right-1 z-20 h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+            className="absolute top-0.5 right-0.5 z-20 h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
             data-testid={`button-remove-miner-${miner.id}`}
           >
             <X className="w-4 h-4" />
