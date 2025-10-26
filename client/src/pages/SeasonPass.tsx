@@ -103,6 +103,9 @@ export default function SeasonPass() {
 
   const canClaim = (tier: number) => currentTier >= tier;
   const isClaimed = (rewardId: string) => claimedRewards.includes(rewardId);
+  
+  const upgradeCost = 200;
+  const canAffordUpgrade = user && parseFloat(user.mereBalance) >= upgradeCost;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/5 pb-20">
@@ -129,11 +132,11 @@ export default function SeasonPass() {
             {!hasPremium && (
               <Button
                 onClick={() => upgradeMutation.mutate()}
-                disabled={upgradeMutation.isPending}
+                disabled={!canAffordUpgrade || upgradeMutation.isPending}
                 className="bg-gold-gradient text-black font-bold"
                 data-testid="button-upgrade-premium"
               >
-                Upgrade (200 MERE)
+                {canAffordUpgrade ? "Upgrade (200 MERE)" : "Insufficient Balance"}
               </Button>
             )}
           </div>
@@ -298,12 +301,12 @@ export default function SeasonPass() {
             </ul>
             <Button
               onClick={() => upgradeMutation.mutate()}
-              disabled={upgradeMutation.isPending}
+              disabled={!canAffordUpgrade || upgradeMutation.isPending}
               className="w-full mt-4 bg-gold-gradient text-black font-bold"
               size="lg"
               data-testid="button-upgrade-premium-cta"
             >
-              Upgrade Now (200 MERE)
+              {canAffordUpgrade ? "Upgrade Now (200 MERE)" : "Insufficient Balance (Need 200 MERE)"}
             </Button>
           </Card>
         )}

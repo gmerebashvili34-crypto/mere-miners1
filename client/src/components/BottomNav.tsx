@@ -19,8 +19,8 @@ export function BottomNav() {
           const isActive = location === path;
           return (
             <Link key={path} href={path}>
-              <a
-                className={`flex flex-col items-center justify-center h-full gap-1 transition-colors ${
+              <div
+                className={`flex flex-col items-center justify-center h-full gap-1 transition-colors cursor-pointer ${
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground hover-elevate"
@@ -29,7 +29,7 @@ export function BottomNav() {
               >
                 <Icon className={`w-5 h-5 ${isActive ? "animate-pulse-glow" : ""}`} />
                 <span className="text-xs font-medium">{label}</span>
-              </a>
+              </div>
             </Link>
           );
         })}
