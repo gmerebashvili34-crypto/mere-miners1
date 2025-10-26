@@ -15,13 +15,11 @@ function generateReferralCode(): string {
 export async function signUp(
   email: string,
   password: string,
-  firstName: string,
-  lastName: string,
   referralCode?: string
 ) {
   // Validate inputs
-  if (!email || !password || !firstName || !lastName) {
-    throw new Error("All fields are required");
+  if (!email || !password) {
+    throw new Error("Email and password are required");
   }
 
   if (password.length < 8) {
@@ -51,8 +49,6 @@ export async function signUp(
   const newUser = await db.insert(users).values({
     email,
     passwordHash,
-    firstName,
-    lastName,
     referralCode: generateReferralCode(),
     referredById,
   }).returning();

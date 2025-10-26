@@ -14,7 +14,6 @@ import Wallet from "@/pages/Wallet";
 import Leaderboard from "@/pages/Leaderboard";
 import SeasonPass from "@/pages/SeasonPass";
 import Profile from "@/pages/Profile";
-import Admin from "@/pages/Admin";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -46,7 +45,6 @@ function Router() {
           <Route path="/leaderboard" component={Leaderboard} />
           <Route path="/season-pass" component={SeasonPass} />
           <Route path="/profile" component={Profile} />
-          <Route path="/admin" component={Admin} />
         </>
       )}
       <Route component={NotFound} />

@@ -8,7 +8,6 @@ import { achievements, userAchievements, users, minerTypes, userMiners, transact
 import { eq, sum, count, sql, isNotNull } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
-import { requireAdmin } from "./adminMiddleware";
 import { signUp, signIn, requireUserId } from "./emailAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -18,9 +17,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Email/Password authentication routes
   app.post('/api/auth/signup', async (req, res) => {
     try {
-      const { email, password, firstName, lastName, referralCode } = req.body;
+      const { email, password, referralCode } = req.body;
       
-      const user = await signUp(email, password, firstName, lastName, referralCode);
+      const user = await signUp(email, password, referralCode);
       
       // Set session
       (req.session as any).userId = user.id;
@@ -535,185 +534,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching referral stats:", error);
       res.status(500).json({ message: "Failed to fetch referral stats" });
-    }
-  });
-
-  // Admin routes
-  app.get('/api/admin/stats', isAuthenticated, requireAdmin, async (_req, res) => {
-    try {
-      // Get total users
-      const totalUsersResult = await db.select({ count: count() }).from(users);
-      const totalUsers = Number(totalUsersResult[0]?.count || 0);
-
-      // Get total MERE in circulation (sum of all user balances)
-      const totalMereResult = await db.select({ total: sum(users.mereBalance) }).from(users);
-      const totalMereInCirculation = parseFloat(totalMereResult[0]?.total || "0");
-
-      // Get total MERE mined
-      const totalMinedResult = await db.select({ total: sum(users.totalMined) }).from(users);
-      const totalMereMined = parseFloat(totalMinedResult[0]?.total || "0");
-
-      // Get active miners count
-      const activeMinersResult = await db.select({ count: count() })
-        .from(userMiners)
-        .where(eq(userMiners.isActive, true));
-      const activeMiners = Number(activeMinersResult[0]?.count || 0);
-
-      // Get placed miners count (miners with slot positions)
-      const placedMinersResult = await db.select({ count: count() })
-        .from(userMiners)
-        .where(isNotNull(userMiners.slotPosition));
-      const placedMiners = Number(placedMinersResult[0]?.count || 0);
-
-      // Get transaction stats
-      const totalTransactionsResult = await db.select({ count: count() }).from(transactions);
-      const totalTransactions = Number(totalTransactionsResult[0]?.count || 0);
-
-      // Get total deposits value
-      const totalDepositsResult = await db.select({ total: sum(transactions.amountMere) })
-        .from(transactions)
-        .where(eq(transactions.type, "deposit"));
-      const totalDeposits = parseFloat(totalDepositsResult[0]?.total || "0");
-
-      // Get total withdrawals value
-      const totalWithdrawalsResult = await db.select({ total: sum(transactions.amountMere) })
-        .from(transactions)
-        .where(eq(transactions.type, "withdrawal"));
-      const totalWithdrawals = parseFloat(totalWithdrawalsResult[0]?.total || "0");
-
-      res.json({
-        totalUsers,
-        totalMereInCirculation,
-        totalMereMined,
-        activeMiners,
-        placedMiners,
-        totalTransactions,
-        totalDeposits,
-        totalWithdrawals,
-      });
-    } catch (error) {
-      console.error("Error fetching admin stats:", error);
-      res.status(500).json({ message: "Failed to fetch admin stats" });
-    }
-  });
-
-  app.get('/api/admin/users', isAuthenticated, requireAdmin, async (_req, res) => {
-    try {
-      const allUsers = await db.select({
-        id: users.id,
-        email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        mereBalance: users.mereBalance,
-        totalMined: users.totalMined,
-        isAdmin: users.isAdmin,
-        totalReferrals: users.totalReferrals,
-        createdAt: users.createdAt,
-      }).from(users);
-
-      res.json(allUsers);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-      res.status(500).json({ message: "Failed to fetch users" });
-    }
-  });
-
-  app.patch('/api/admin/users/:userId/admin', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const { userId } = req.params;
-      const { isAdmin } = req.body;
-
-      if (typeof isAdmin !== 'boolean') {
-        return res.status(400).json({ message: "Invalid request" });
-      }
-
-      await db.update(users)
-        .set({ isAdmin })
-        .where(eq(users.id, userId));
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error updating user admin status:", error);
-      res.status(500).json({ message: "Failed to update user admin status" });
-    }
-  });
-
-  app.get('/api/admin/miners', isAuthenticated, requireAdmin, async (_req, res) => {
-    try {
-      const allMiners = await db.select().from(minerTypes);
-      res.json(allMiners);
-    } catch (error) {
-      console.error("Error fetching miners:", error);
-      res.status(500).json({ message: "Failed to fetch miners" });
-    }
-  });
-
-  app.patch('/api/admin/miners/:minerId', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const { minerId } = req.params;
-      const updates = req.body;
-
-      // Validate fields
-      const allowedFields = ['name', 'description', 'thRate', 'basePriceMere', 'basePriceUsd', 'dailyYieldMere', 'dailyYieldUsd', 'roiDays', 'isAvailable'];
-      const updateData: any = {};
-      
-      for (const field of allowedFields) {
-        if (updates[field] !== undefined) {
-          updateData[field] = updates[field];
-        }
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ message: "No valid fields to update" });
-      }
-
-      await db.update(minerTypes)
-        .set(updateData)
-        .where(eq(minerTypes.id, minerId));
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error updating miner type:", error);
-      res.status(500).json({ message: "Failed to update miner type" });
-    }
-  });
-
-  app.get('/api/admin/seasons', isAuthenticated, requireAdmin, async (_req, res) => {
-    try {
-      const allSeasons = await db.select().from(seasons);
-      res.json(allSeasons);
-    } catch (error) {
-      console.error("Error fetching seasons:", error);
-      res.status(500).json({ message: "Failed to fetch seasons" });
-    }
-  });
-
-  app.patch('/api/admin/seasons/:seasonId', isAuthenticated, requireAdmin, async (req: any, res) => {
-    try {
-      const { seasonId } = req.params;
-      const updates = req.body;
-
-      const allowedFields = ['name', 'startAt', 'endAt', 'isActive'];
-      const updateData: any = {};
-      
-      for (const field of allowedFields) {
-        if (updates[field] !== undefined) {
-          updateData[field] = updates[field];
-        }
-      }
-
-      if (Object.keys(updateData).length === 0) {
-        return res.status(400).json({ message: "No valid fields to update" });
-      }
-
-      await db.update(seasons)
-        .set(updateData)
-        .where(eq(seasons.id, seasonId));
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error("Error updating season:", error);
-      res.status(500).json({ message: "Failed to update season" });
     }
   });
 

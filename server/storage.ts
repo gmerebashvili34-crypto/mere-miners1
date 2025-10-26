@@ -25,6 +25,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
+import { nanoid } from "nanoid";
 
 // Interface for storage operations
 export interface IStorage {
@@ -81,9 +82,15 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // Generate referral code if not provided
+    const referralCode = userData.referralCode || `MERE${nanoid(6).toUpperCase()}`;
+    
     const [user] = await db
       .insert(users)
-      .values(userData)
+      .values({
+        ...userData,
+        referralCode,
+      })
       .onConflictDoUpdate({
         target: users.id,
         set: {
