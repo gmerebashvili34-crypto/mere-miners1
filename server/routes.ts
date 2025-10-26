@@ -9,7 +9,7 @@ import { eq, sum, count, sql, isNotNull } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
 import { requireAdmin } from "./adminMiddleware";
-import { signUp, signIn } from "./emailAuth";
+import { signUp, signIn, requireUserId } from "./emailAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -87,7 +87,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Fall back to Replit Auth
       if (req.user?.claims?.sub) {
-        const userId = getUserId(req);
+        const userId = requireUserId(req, res);
+      if (!userId) return;
         const user = await storage.getUser(userId);
         return res.json(user);
       }
@@ -119,7 +120,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/shop/buy', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       if (!userId) {
         return res.status(401).json({ message: "Unauthorized" });
       }
@@ -186,7 +188,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mining room routes
   app.get('/api/mining/room', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const miners = await storage.getUserMiners(userId);
       res.json(miners);
     } catch (error) {
@@ -197,7 +200,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/mining/slots', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const slotCount = await storage.getUserSlotCount(userId);
       res.json({ totalSlots: 20, unlockedSlots: slotCount });
     } catch (error) {
@@ -208,7 +212,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/mining/place', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const { minerId, slotPosition } = req.body;
 
       if (!minerId || slotPosition === undefined) {
@@ -236,7 +241,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/mining/remove', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const { minerId } = req.body;
 
       if (!minerId) {
@@ -261,7 +267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/mining/unlock-slot', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
 
       // Check user balance
       const user = await storage.getUser(userId);
@@ -295,7 +302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Wallet routes
   app.get('/api/wallet/transactions', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const transactions = await storage.getUserTransactions(userId);
       res.json(transactions);
     } catch (error) {
@@ -318,7 +326,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/wallet/withdraw', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const { amountMere } = req.body;
 
       const amount = parseFloat(amountMere);
@@ -393,7 +402,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Season Pass routes
   app.get('/api/season-pass', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const season = await storage.getCurrentSeason();
       
       if (!season) {
@@ -420,7 +430,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/season-pass/upgrade', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const upgradeCost = 200; // 200 MERE
 
       // Check balance
@@ -462,7 +473,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/season-pass/claim', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const { rewardId } = req.body;
 
       if (!rewardId) {
@@ -489,7 +501,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Achievements routes
   app.get('/api/achievements', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       
       // Get all achievements with user progress
       const allAchievements = await db.select().from(achievements).where(eq(achievements.isActive, true));
@@ -515,7 +528,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Referral routes
   app.get('/api/referrals', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = getUserId(req);
+      const userId = requireUserId(req, res);
+      if (!userId) return;
       const stats = await getReferralStats(userId);
       res.json(stats);
     } catch (error) {

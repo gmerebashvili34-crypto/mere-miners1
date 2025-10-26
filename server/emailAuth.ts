@@ -3,6 +3,7 @@ import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcrypt";
 import { nanoid } from "nanoid";
+import type { Request, Response } from "express";
 
 const SALT_ROUNDS = 10;
 
@@ -96,4 +97,25 @@ export async function signIn(email: string, password: string) {
   }
 
   return user;
+}
+
+// Helper to get user ID from either session or Replit Auth
+export function getUserId(req: Request): string | null {
+  if (req.session?.userId) {
+    return req.session.userId;
+  }
+  if (req.user?.claims?.sub) {
+    return req.user.claims.sub;
+  }
+  return null;
+}
+
+// Helper that returns userId or sends 401 and returns undefined
+export function requireUserId(req: Request, res: Response): string | undefined {
+  const userId = getUserId(req);
+  if (!userId) {
+    res.status(401).json({ message: "Unauthorized" });
+    return undefined;
+  }
+  return userId;
 }
