@@ -18,7 +18,7 @@ async function seed() {
     {
       name: "Cube Miner",
       description: "Entry-level compact mining unit with reliable performance",
-      imageUrl: "/attached_assets/generated_images/3D_cube_miner_toy_5d2c8aa5.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Cube_Miner_df655445.png",
       thRate: 1.0,
       basePriceUsd: "13.99",
       basePriceMere: "27.98",
@@ -31,7 +31,7 @@ async function seed() {
     {
       name: "Tower Miner",
       description: "Elegant vertical design with enhanced cooling",
-      imageUrl: "/attached_assets/generated_images/3D_tower_miner_toy_c3b3e643.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Tower_Miner_e7e82e4e.png",
       thRate: 2.5,
       basePriceUsd: "34.98",
       basePriceMere: "69.96",
@@ -44,7 +44,7 @@ async function seed() {
     {
       name: "Crystal Miner",
       description: "Crystalline structure with prismatic light refraction",
-      imageUrl: "/attached_assets/generated_images/3D_crystal_miner_toy_51ddddc1.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Crystal_Miner_1d9d4571.png",
       thRate: 3.5,
       basePriceUsd: "48.98",
       basePriceMere: "97.96",
@@ -57,7 +57,7 @@ async function seed() {
     {
       name: "Sphere Miner",
       description: "Advanced spherical design with hexagonal pattern",
-      imageUrl: "/attached_assets/generated_images/3D_sphere_miner_toy_0ad19441.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Sphere_Miner_73ef060f.png",
       thRate: 5.0,
       basePriceUsd: "69.95",
       basePriceMere: "139.90",
@@ -70,7 +70,7 @@ async function seed() {
     {
       name: "Spiral Reactor",
       description: "Spiral design with advanced cooling system",
-      imageUrl: "/attached_assets/generated_images/3D_spiral_reactor_toy_601d962e.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Spiral_Reactor_b5d19ded.png",
       thRate: 7.5,
       basePriceUsd: "104.93",
       basePriceMere: "209.86",
@@ -83,7 +83,7 @@ async function seed() {
     {
       name: "Quantum Box",
       description: "Minimalist high-performance mining unit",
-      imageUrl: "/attached_assets/generated_images/3D_quantum_box_toy_f58da41d.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Quantum_Box_0113fbe1.png",
       thRate: 10.0,
       basePriceUsd: "139.90",
       basePriceMere: "279.80",
@@ -96,7 +96,7 @@ async function seed() {
     {
       name: "Fusion Core",
       description: "Compact fusion reactor with quantum processing",
-      imageUrl: "/attached_assets/generated_images/3D_fusion_core_toy_896391d2.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Fusion_Core_42614645.png",
       thRate: 15.0,
       basePriceUsd: "209.85",
       basePriceMere: "419.70",
@@ -109,7 +109,7 @@ async function seed() {
     {
       name: "Titan Core",
       description: "Industrial-grade processing with triple redundancy",
-      imageUrl: "/attached_assets/generated_images/3D_titan_core_toy_d428c84b.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Titan_Core_83a39a31.png",
       thRate: 20.0,
       basePriceUsd: "279.80",
       basePriceMere: "559.60",
@@ -122,7 +122,7 @@ async function seed() {
     {
       name: "Pyramid Elite",
       description: "Elite-tier supercomputer with holographic circuitry",
-      imageUrl: "/attached_assets/generated_images/3D_pyramid_elite_toy_6f249ad7.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Pyramid_Elite_7d5b9b3d.png",
       thRate: 25.0,
       basePriceUsd: "349.75",
       basePriceMere: "699.50",
@@ -135,7 +135,7 @@ async function seed() {
     {
       name: "Mega Fortress",
       description: "Ultimate powerhouse with AI-driven optimization",
-      imageUrl: "/attached_assets/generated_images/3D_mega_fortress_toy_07aae49e.png",
+      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Mega_Fortress_0fe903cd.png",
       thRate: 50.0,
       basePriceUsd: "699.50",
       basePriceMere: "1399.00",
