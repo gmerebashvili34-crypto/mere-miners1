@@ -38,6 +38,7 @@ export const users = pgTable("users", {
   referredById: varchar("referred_by_id").references((): any => users.id), // Who invited this user
   totalReferrals: integer("total_referrals").notNull().default(0), // Count of successful referrals
   totalReferralEarnings: numeric("total_referral_earnings", { precision: 20, scale: 8 }).notNull().default("0"), // Total MERE earned from referrals
+  isAdmin: boolean("is_admin").notNull().default(false), // Admin access flag
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
