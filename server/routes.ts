@@ -125,9 +125,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Unauthorized" });
       }
       
-      const { minerTypeId, quantity } = req.body;
+      const { minerTypeId } = req.body;
 
-      if (!minerTypeId || !quantity || quantity < 1) {
+      if (!minerTypeId) {
         return res.status(400).json({ message: "Invalid request" });
       }
 
@@ -137,11 +137,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Miner not found or unavailable" });
       }
 
-      // Calculate total cost with bulk discount
-      const totalTH = minerType.thRate * quantity;
-      const pricePerTH = parseFloat(minerType.basePriceMere) / minerType.thRate;
-      const pricing = calculateDiscountedPrice(totalTH);
-      const finalCost = pricing.finalPrice;
+      // Check if user already owns this miner type (one per type limit)
+      const ownedMiners = await storage.getUserMiners(userId);
+      const alreadyOwns = ownedMiners.some(m => m.minerType.id === minerTypeId);
+      if (alreadyOwns) {
+        return res.status(400).json({ message: "You already own this miner type. Each miner can only be purchased once." });
+      }
+
+      // Use base price (no bulk discounts, quantity is always 1)
+      const finalCost = parseFloat(minerType.basePriceMere);
 
       // Check user balance
       const user = await storage.getUser(userId);
@@ -152,16 +156,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Deduct balance
       await storage.updateUserBalance(userId, finalCost.toString(), "subtract");
 
-      // Create user miners
-      for (let i = 0; i < quantity; i++) {
-        await storage.createUserMiner({
-          userId,
-          minerTypeId,
-          slotPosition: null,
-          isActive: true,
-          boostMultiplier: 1.0,
-        });
-      }
+      // Create user miner (only one)
+      await storage.createUserMiner({
+        userId,
+        minerTypeId,
+        slotPosition: null,
+        isActive: true,
+        boostMultiplier: 1.0,
+      });
 
       // Record transaction
       await storage.createTransaction({
@@ -169,9 +171,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         type: "purchase",
         amountMere: finalCost.toString(),
         amountUsd: (finalCost * 0.5).toString(),
-        description: `Purchased ${quantity}x ${minerType.name}`,
+        description: `Purchased ${minerType.name}`,
         status: "completed",
-        metadata: { minerTypeId, quantity },
+        metadata: { minerTypeId, quantity: 1 },
       });
 
       // Check and unlock achievements

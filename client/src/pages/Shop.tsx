@@ -2,13 +2,11 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
 import { MinerCard } from "@/components/MinerCard";
 import { BottomNav } from "@/components/BottomNav";
-import { ShoppingBag, Wallet, Calculator, Sparkles } from "lucide-react";
+import { ShoppingBag, Wallet, Sparkles } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { formatMERE, formatUSD, mereToUSD, calculateDiscountedPrice, TH_BASE_PRICE_MERE } from "@/lib/constants";
+import { formatMERE, formatUSD, mereToUSD, TH_BASE_PRICE_MERE } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { MinerType, UserMiner } from "@shared/schema";
@@ -25,8 +23,6 @@ export default function Shop() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedMiner, setSelectedMiner] = useState<MinerType | null>(null);
-  const [showBulkCalculator, setShowBulkCalculator] = useState(false);
-  const [bulkTH, setBulkTH] = useState(10);
   
   // Fetch user's owned miners to check what they already have
   const { data: ownedMiners = [] } = useQuery<(UserMiner & { minerType: MinerType })[]>({
@@ -91,8 +87,6 @@ export default function Shop() {
   const cost = getTotalCost();
   const canAfford = user && parseFloat(user.mereBalance) >= cost.finalPrice;
 
-  const bulkCalculation = calculateDiscountedPrice(bulkTH);
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center pb-20">
@@ -112,16 +106,6 @@ export default function Shop() {
               Miner Shop
             </h1>
             <div className="flex items-center gap-3">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowBulkCalculator(true)}
-                className="gap-2"
-                data-testid="button-bulk-calculator"
-              >
-                <Calculator className="w-4 h-4" />
-                Bulk
-              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -232,55 +216,6 @@ export default function Shop() {
         </DialogContent>
       </Dialog>
 
-      {/* Bulk Calculator Dialog */}
-      <Dialog open={showBulkCalculator} onOpenChange={setShowBulkCalculator}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Bulk Purchase Calculator</DialogTitle>
-            <DialogDescription>
-              See how much you save with bulk orders
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 py-4">
-            <div>
-              <div className="flex justify-between mb-2">
-                <label className="text-sm font-medium">Total Hash Rate (TH/s)</label>
-                <span className="font-bold text-primary">{bulkTH} TH/s</span>
-              </div>
-              <Slider
-                value={[bulkTH]}
-                onValueChange={([value]) => setBulkTH(value)}
-                min={1}
-                max={100}
-                step={1}
-                className="mb-4"
-              />
-            </div>
-
-            <Card className="p-4 space-y-3 bg-accent/20">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="text-muted-foreground">Base Price:</div>
-                <div className="text-right">{formatMERE(bulkCalculation.originalPrice)}</div>
-                
-                <div className="text-muted-foreground">Discount:</div>
-                <div className="text-right text-primary font-semibold">
-                  {bulkCalculation.discountPercent.toFixed(2)}% (-{formatMERE(bulkCalculation.discount)})
-                </div>
-                
-                <div className="text-muted-foreground font-semibold pt-2 border-t border-border">Final Price:</div>
-                <div className="text-right font-bold text-lg bg-gold-gradient bg-clip-text text-transparent pt-2 border-t border-border">
-                  {formatMERE(bulkCalculation.finalPrice)}
-                </div>
-              </div>
-            </Card>
-
-            <div className="text-xs text-muted-foreground text-center">
-              Formula: Discount = min(20%, 5% × log₁₀(TH + 1))
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <BottomNav />
     </div>
