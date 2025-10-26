@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Zap, TrendingUp, X, ArrowUp } from "lucide-react";
 import type { UserMiner, MinerType } from "@shared/schema";
-import { formatMERE, formatUSD, mereToUSD, TH_DAILY_YIELD_MERE } from "@/lib/constants";
+import { formatMERE, mereToUSD, TH_DAILY_YIELD_MERE } from "@/lib/constants";
 
 interface MiningSlotProps {
   slotNumber: number;
@@ -75,28 +75,16 @@ export function MiningSlot({
   const upgradeCost = 25.98;
 
   return (
-    <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group">
+    <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group flex flex-col">
       {onRemoveMiner && (
         <Button
           size="icon"
           variant="ghost"
-          className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-black/50 hover:bg-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/70 hover:bg-destructive opacity-0 group-hover:opacity-100 transition-opacity"
           onClick={() => onRemoveMiner(miner.id)}
           data-testid={`button-remove-miner-${miner.id}`}
         >
-          <X className="w-3 h-3 text-white" />
-        </Button>
-      )}
-
-      {onUpgradeMiner && (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="absolute top-1 right-7 z-10 w-5 h-5 rounded-full bg-black/50 hover:bg-primary opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => onUpgradeMiner(miner.id)}
-          data-testid={`button-upgrade-miner-${miner.id}`}
-        >
-          <ArrowUp className="w-3 h-3 text-white" />
+          <X className="w-4 h-4 text-white" />
         </Button>
       )}
 
@@ -147,7 +135,7 @@ export function MiningSlot({
         )}
       </div>
 
-      <div className="p-2 space-y-1">
+      <div className="flex-1 p-2 space-y-1">
         <h4 className="font-semibold text-xs text-foreground truncate" data-testid={`text-placed-miner-name-${miner.id}`}>
           {miner.minerType.name}
         </h4>
@@ -161,22 +149,24 @@ export function MiningSlot({
           </div>
           <div className="flex items-center gap-0.5">
             <TrendingUp className="w-2.5 h-2.5 text-primary" />
-            <span className="font-semibold text-primary">{formatMERE(dailyYield)}/day</span>
+            <span className="font-semibold text-primary text-[9px]">{formatMERE(dailyYield)}/d</span>
           </div>
         </div>
-
-        <div className="text-[10px] text-muted-foreground">
-          ≈ {formatUSD(mereToUSD(dailyYield))}/day
-        </div>
-
-        {onUpgradeMiner && (
-          <div className="pt-0.5">
-            <p className="text-[10px] text-muted-foreground">
-              Upgrade: {upgradeCost} MERE
-            </p>
-          </div>
-        )}
       </div>
+
+      {onUpgradeMiner && (
+        <div className="p-2 pt-0 mt-auto">
+          <Button
+            size="sm"
+            onClick={() => onUpgradeMiner(miner.id)}
+            className="w-full h-7 bg-gold-gradient text-black font-bold text-[10px] flex items-center justify-center gap-1"
+            data-testid={`button-upgrade-miner-${miner.id}`}
+          >
+            <ArrowUp className="w-3 h-3" />
+            <span>Upgrade ({upgradeCost} MERE)</span>
+          </Button>
+        </div>
+      )}
     </Card>
   );
 }

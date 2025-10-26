@@ -86,9 +86,10 @@ export default function MiningRoom() {
   });
 
   // Upgrade miner mutation
-  const upgradeMinerMutation = useMutation({
+  const upgradeMinerMutation = useMutation<{ newLevel: number; cost: number }, Error, string>({
     mutationFn: async (minerId: string) => {
-      return await apiRequest("POST", "/api/mining/upgrade", { minerId });
+      const response = await apiRequest("POST", "/api/mining/upgrade", { minerId });
+      return response as unknown as { newLevel: number; cost: number };
     },
     onSuccess: (data: { newLevel: number; cost: number }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/mining/room"] });
@@ -248,9 +249,9 @@ export default function MiningRoom() {
           ))}
         </div>
 
-        {/* USD Equivalent */}
+        {/* USDT Equivalent */}
         <div className="text-center text-sm text-muted-foreground mb-6">
-          Daily earnings: <span className="text-foreground font-semibold">{formatUSD(mereToUSD(totalDailyEarnings))}</span>
+          Daily earnings: <span className="text-foreground font-semibold">{mereToUSD(totalDailyEarnings).toFixed(2)} USDT</span>
         </div>
 
         {/* Quick Actions */}
