@@ -359,7 +359,7 @@ export default function Wallet() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">TRON Address (TRC-20)</div>
+                  <div className="text-sm font-medium">USDT(TRC-20) Address</div>
                   <div className="flex gap-2">
                     <Input
                       value={depositAddress}
