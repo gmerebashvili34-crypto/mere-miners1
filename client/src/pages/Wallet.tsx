@@ -31,6 +31,7 @@ export default function Wallet() {
   const [convertDirection, setConvertDirection] = useState<"mere-to-usdt" | "usdt-to-mere">("mere-to-usdt");
   const [depositAddress, setDepositAddress] = useState("");
   const [copied, setCopied] = useState(false);
+  const [withdrawAddress, setWithdrawAddress] = useState("");
 
   // Fetch transactions
   const { data: transactions = [] } = useQuery<Transaction[]>({
@@ -50,14 +51,18 @@ export default function Wallet() {
 
   // Withdraw mutation
   const withdrawMutation = useMutation({
-    mutationFn: async (amount: string) => {
-      await apiRequest("POST", "/api/wallet/withdraw", { amountMere: amount });
+    mutationFn: async (data: { amountUsdt: string, address: string }) => {
+      await apiRequest("POST", "/api/wallet/withdraw", { 
+        amountMere: usdToMERE(parseFloat(data.amountUsdt)).toString(),
+        address: data.address
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/wallet/transactions"] });
       setShowWithdraw(false);
       setWithdrawAmount("");
+      setWithdrawAddress("");
       toast({
         title: "Withdrawal Initiated",
         description: "Your withdrawal is being processed",
@@ -122,7 +127,15 @@ export default function Wallet() {
       });
       return;
     }
-    withdrawMutation.mutate(withdrawAmount);
+    if (!withdrawAddress || withdrawAddress.length < 10) {
+      toast({
+        title: "Invalid Address",
+        description: "Please enter a valid TRC-20 wallet address",
+        variant: "destructive",
+      });
+      return;
+    }
+    withdrawMutation.mutate({ amountUsdt: withdrawAmount, address: withdrawAddress });
   };
 
   const handleConvert = () => {
@@ -176,9 +189,9 @@ export default function Wallet() {
 
   const mereBalance = parseFloat(user?.mereBalance || "0");
   const usdBalance = mereToUSD(mereBalance);
-  const withdrawAmountMere = parseFloat(withdrawAmount) || 0;
-  const withdrawFee = withdrawAmountMere * 0.02; // 2% fee
-  const withdrawTotal = withdrawAmountMere - withdrawFee;
+  const withdrawAmountUsdt = parseFloat(withdrawAmount) || 0;
+  const withdrawFee = withdrawAmountUsdt * 0.02; // 2% fee
+  const withdrawTotal = withdrawAmountUsdt - withdrawFee;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/5 pb-20">
@@ -398,13 +411,25 @@ export default function Wallet() {
           <DialogHeader>
             <DialogTitle>Withdraw USDT (TRC-20)</DialogTitle>
             <DialogDescription>
-              Convert MERE to USDT and withdraw to your wallet
+              Withdraw USDT to your external wallet
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Amount (MERE)</label>
+              <label className="text-sm font-medium mb-2 block">Withdrawal Address (TRC-20)</label>
+              <Input
+                type="text"
+                placeholder="TRC-20 wallet address"
+                value={withdrawAddress}
+                onChange={(e) => setWithdrawAddress(e.target.value)}
+                className="font-mono text-sm"
+                data-testid="input-withdraw-address"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium mb-2 block">Amount (USDT)</label>
               <Input
                 type="number"
                 placeholder="0.00"
@@ -413,27 +438,24 @@ export default function Wallet() {
                 data-testid="input-withdraw-amount"
               />
               <div className="text-xs text-muted-foreground mt-1">
-                Available: {formatMERE(mereBalance)} MERE
+                Available: {usdBalance.toFixed(2)} USDT
               </div>
             </div>
 
-            {withdrawAmountMere > 0 && (
+            {withdrawAmountUsdt > 0 && (
               <Card className="p-4 space-y-2 bg-accent/20">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Amount:</span>
-                  <span>{formatMERE(withdrawAmountMere)} MERE</span>
+                  <span>{withdrawAmountUsdt.toFixed(2)} USDT</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Fee (2%):</span>
-                  <span className="text-status-busy">-{formatMERE(withdrawFee)} MERE</span>
+                  <span className="text-status-busy">-{withdrawFee.toFixed(2)} USDT</span>
                 </div>
                 <div className="flex justify-between text-sm pt-2 border-t border-border">
                   <span className="font-semibold">You will receive:</span>
                   <div className="text-right">
-                    <div className="font-bold">{formatMERE(withdrawTotal)} MERE</div>
-                    <div className="text-xs text-muted-foreground">
-                      ≈ {mereToUSD(withdrawTotal).toFixed(2)} USDT
-                    </div>
+                    <div className="font-bold text-primary">{withdrawTotal.toFixed(2)} USDT</div>
                   </div>
                 </div>
               </Card>
@@ -441,7 +463,7 @@ export default function Wallet() {
 
             <Card className="p-4 bg-primary/10">
               <div className="text-sm text-muted-foreground">
-                <strong>Note:</strong> This is a demo. In production, you would need to provide a TRC-20 wallet address for withdrawal.
+                <strong>Important:</strong> Only withdraw to a valid TRC-20 wallet address. Withdrawals are final and cannot be reversed.
               </div>
             </Card>
           </div>
@@ -452,7 +474,7 @@ export default function Wallet() {
             </Button>
             <Button
               onClick={handleWithdraw}
-              disabled={withdrawAmountMere <= 0 || withdrawAmountMere > mereBalance || withdrawMutation.isPending}
+              disabled={withdrawAmountUsdt <= 0 || withdrawAmountUsdt > usdBalance || !withdrawAddress || withdrawMutation.isPending}
               className="bg-gold-gradient text-black font-bold"
               data-testid="button-confirm-withdraw"
             >
