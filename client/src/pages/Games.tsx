@@ -50,14 +50,24 @@ export default function Games() {
   });
 
   const handleSpin = async () => {
+    if (spinning || playMutation.isPending) return; // Prevent concurrent spins
+    
     setSpinning(true);
     setShowReward(false);
     
     // Simulate spinning animation for 2 seconds
-    setTimeout(async () => {
-      await playMutation.mutateAsync();
-      setSpinning(false);
+    const timer = setTimeout(async () => {
+      try {
+        await playMutation.mutateAsync();
+      } catch (error) {
+        // Error already handled by mutation onError
+      } finally {
+        setSpinning(false);
+      }
     }, 2000);
+    
+    // Cleanup timer on unmount
+    return () => clearTimeout(timer);
   };
 
   // Update countdown timer
