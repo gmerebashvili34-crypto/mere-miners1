@@ -5,7 +5,7 @@ import { setupAuth, isAuthenticated } from "./replitAuth";
 import { calculateDiscountedPrice, TH_DAILY_YIELD_MERE, SLOT_EXPANSION_PRICE_MERE } from "@shared/constants";
 import { db } from "./db";
 import { achievements, userAchievements, users, minerTypes, userMiners, transactions, seasons } from "@shared/schema";
-import { eq, sum, count, sql, isNotNull } from "drizzle-orm";
+import { eq, sum, count, sql, isNotNull, and } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
 import { signUp, signIn, requireUserId } from "./emailAuth";
@@ -116,15 +116,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const { firstName, lastName } = req.body;
 
-      if (!firstName || !lastName) {
-        return res.status(400).json({ message: "First name and last name are required" });
+      if (!firstName) {
+        return res.status(400).json({ message: "First name is required" });
       }
 
       await db
         .update(users)
         .set({
           firstName: firstName.trim(),
-          lastName: lastName.trim(),
+          lastName: (lastName || "").trim(),
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
