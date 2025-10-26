@@ -575,12 +575,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No active season" });
       }
 
+      // Get the reward details
+      const [reward] = await db.select().from(seasonPassRewards).where(eq(seasonPassRewards.id, rewardId));
+      
+      if (!reward) {
+        return res.status(404).json({ message: "Reward not found" });
+      }
+
       // Claim reward
       await storage.claimSeasonPassReward(userId, season.id, rewardId);
 
-      // TODO: Grant the reward based on type (MERE, miner, booster)
+      // Grant the reward based on type
+      if (reward.rewardType === "mere" && reward.rewardValue) {
+        // Credit MERE to user balance
+        const amount = parseFloat(reward.rewardValue);
+        await storage.updateUserBalance(userId, amount.toString(), "add");
+        
+        // Create transaction record
+        await storage.createTransaction({
+          userId,
+          type: "reward",
+          amountMere: amount.toString(),
+          description: `Season Pass Tier ${reward.tier} Reward`,
+          status: "completed",
+        });
+      } else if (reward.rewardType === "booster" && reward.rewardMetadata) {
+        // Apply hashrate booster to all active miners
+        const metadata = reward.rewardMetadata as any;
+        const boostMultiplier = metadata.multiplier || 1.0;
+        
+        await db.update(userMiners)
+          .set({ boostMultiplier: sql`${userMiners.boostMultiplier} * ${boostMultiplier}` })
+          .where(and(
+            eq(userMiners.userId, userId),
+            eq(userMiners.isActive, true)
+          ));
+      }
+      // Note: "miner" and "skin" rewards would require additional implementation
 
-      res.json({ success: true });
+      res.json({ success: true, reward });
     } catch (error) {
       console.error("Error claiming reward:", error);
       res.status(500).json({ message: "Failed to claim reward" });

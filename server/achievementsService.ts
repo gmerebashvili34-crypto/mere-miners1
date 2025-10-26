@@ -149,8 +149,13 @@ export class AchievementsService {
 
     const hasPremiumPass = seasonPass?.hasPremium ? 1 : 0;
 
-    // TODO: Track successful referrals
-    const successfulReferrals = 0;
+    // Track successful referrals (users who were referred by this user)
+    const [referralsResult] = await db
+      .select({ count: count() })
+      .from(users)
+      .where(eq(users.referredById, userId));
+    
+    const successfulReferrals = referralsResult?.count || 0;
 
     return {
       totalMined: parseFloat(user?.totalMined || "0"),
