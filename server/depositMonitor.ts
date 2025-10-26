@@ -1,5 +1,8 @@
 import { tronService } from './tronService';
 import { storage } from './storage';
+import { db } from './db';
+import { transactions } from '@shared/schema';
+import { eq } from 'drizzle-orm';
 
 class DepositMonitor {
   private isRunning: boolean = false;
@@ -12,9 +15,31 @@ class DepositMonitor {
   }
 
   /**
+   * Load the last processed transaction ID from database
+   */
+  private async loadLastProcessedTxId(): Promise<void> {
+    try {
+      // Get the most recent deposit transaction by txHash
+      const [lastDeposit] = await db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.type, 'deposit'))
+        .orderBy(transactions.createdAt)
+        .limit(1);
+
+      if (lastDeposit && lastDeposit.txHash) {
+        this.lastProcessedTxId = lastDeposit.txHash;
+        console.log(`📝 Loaded last processed TX: ${this.lastProcessedTxId.substring(0, 10)}...`);
+      }
+    } catch (error) {
+      console.error('❌ Error loading last processed TX ID:', error);
+    }
+  }
+
+  /**
    * Start monitoring for deposits
    */
-  start() {
+  async start() {
     if (this.isRunning) {
       console.log('⚠️ Deposit monitor is already running');
       return;
@@ -22,6 +47,9 @@ class DepositMonitor {
 
     console.log('🚀 Starting deposit monitor...');
     this.isRunning = true;
+
+    // Load last processed transaction ID from database (for idempotency)
+    await this.loadLastProcessedTxId();
 
     // Check immediately on start
     this.checkForDeposits();
@@ -54,6 +82,23 @@ class DepositMonitor {
   }
 
   /**
+   * Check if a transaction hash already exists in the database
+   */
+  private async txHashExists(txHash: string): Promise<boolean> {
+    try {
+      const [existing] = await db
+        .select()
+        .from(transactions)
+        .where(eq(transactions.txHash, txHash))
+        .limit(1);
+      return !!existing;
+    } catch (error) {
+      console.error('❌ Error checking txHash existence:', error);
+      return false;
+    }
+  }
+
+  /**
    * Check for new deposits and credit users
    */
   private async checkForDeposits() {
@@ -68,6 +113,13 @@ class DepositMonitor {
 
       for (const deposit of deposits) {
         try {
+          // Check for duplicate transaction hash (idempotency guard)
+          const exists = await this.txHashExists(deposit.txId);
+          if (exists) {
+            console.log(`⚠️ Skipping duplicate deposit TX: ${deposit.txId}`);
+            continue;
+          }
+
           // Convert USDT to MERE (1 MERE = 0.5 USDT, so USDT * 2 = MERE)
           const mereAmount = deposit.amount * 2;
 

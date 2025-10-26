@@ -81,13 +81,13 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
     
     // Start earnings engine after server is listening
     earningsEngine.start();
     
     // Start deposit monitor for automatic USDT deposit detection
-    depositMonitor.start();
+    await depositMonitor.start();
   });
 })();
