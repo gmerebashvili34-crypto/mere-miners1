@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { Home, ShoppingBag, Trophy, Star, User } from "lucide-react";
+import { Home, ShoppingBag, Trophy, Star, User, Gamepad2 } from "lucide-react";
 
 export function BottomNav() {
   const [location] = useLocation();
@@ -7,6 +7,7 @@ export function BottomNav() {
   const navItems = [
     { icon: Home, label: "Mine", path: "/", testId: "nav-mining" },
     { icon: ShoppingBag, label: "Shop", path: "/shop", testId: "nav-shop" },
+    { icon: Gamepad2, label: "Games", path: "/games", testId: "nav-games" },
     { icon: Trophy, label: "Ranks", path: "/leaderboard", testId: "nav-leaderboard" },
     { icon: Star, label: "Pass", path: "/season-pass", testId: "nav-season-pass" },
     { icon: User, label: "Profile", path: "/profile", testId: "nav-profile" },
@@ -14,7 +15,7 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-pb">
-      <div className="max-w-md mx-auto grid grid-cols-5 h-16">
+      <div className="max-w-md mx-auto grid grid-cols-6 h-16">
         {navItems.map(({ icon: Icon, label, path, testId }) => {
           const isActive = location === path;
           return (
