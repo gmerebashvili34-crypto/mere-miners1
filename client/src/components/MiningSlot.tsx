@@ -113,6 +113,18 @@ export function MiningSlot({
           </div>
         )}
 
+        {onRemoveMiner && (
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowRemoveConfirm(true)}
+            className="absolute top-1 right-1 z-10 h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+            data-testid={`button-remove-miner-${miner.id}`}
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        )}
+
         <div className="relative h-[60%] bg-gradient-to-br from-background/50 to-accent/30 p-2 flex items-center justify-center">
           <div className="w-full h-full flex items-center justify-center">
             <img
@@ -155,7 +167,7 @@ export function MiningSlot({
           </div>
         </div>
 
-        <div className="p-2 pt-0 mt-auto space-y-1.5">
+        <div className="p-2 pt-0 mt-auto">
           {onUpgradeMiner && (
             <Button
               onClick={() => onUpgradeMiner(miner.id)}
@@ -164,18 +176,6 @@ export function MiningSlot({
             >
               <ArrowUp className="w-4 h-4" />
               <span>Upgrade ({upgradeCost} MERE)</span>
-            </Button>
-          )}
-          
-          {onRemoveMiner && (
-            <Button
-              variant="outline"
-              onClick={() => setShowRemoveConfirm(true)}
-              className="w-full border-destructive/50 text-destructive hover:bg-destructive hover:text-white text-xs flex items-center justify-center gap-1.5"
-              data-testid={`button-remove-miner-${miner.id}`}
-            >
-              <X className="w-4 h-4" />
-              <span>Unplace</span>
             </Button>
           )}
         </div>
