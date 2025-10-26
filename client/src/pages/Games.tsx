@@ -3,8 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import { Loader2, Trophy, Sparkles, Gift } from "lucide-react";
+import { Loader2, Trophy, Sparkles, Gift, Gem } from "lucide-react";
 import { useState, useEffect } from "react";
+import { BottomNav } from "@/components/BottomNav";
 
 interface SpinStatus {
   canPlay: boolean;
@@ -107,6 +108,7 @@ export default function Games() {
   }
 
   return (
+    <>
     <div className="container max-w-4xl mx-auto p-4 space-y-6">
       {/* Header */}
       <div className="text-center space-y-2">
@@ -221,6 +223,11 @@ export default function Games() {
           </CardDescription>
         </CardHeader>
       </Card>
+
+      {/* Bottom padding for navigation */}
+      <div className="h-20"></div>
     </div>
+    <BottomNav />
+  </>
   );
 }
