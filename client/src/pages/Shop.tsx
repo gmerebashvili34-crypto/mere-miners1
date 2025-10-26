@@ -204,9 +204,6 @@ export default function Shop() {
                         <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
                           {formatMERE(cost.finalPrice.toFixed(2))}
                         </div>
-                        <div className="text-xs text-muted-foreground font-semibold">
-                          MERE
-                        </div>
                       </div>
                     </div>
                   </div>
