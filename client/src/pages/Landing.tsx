@@ -49,12 +49,6 @@ export default function Landing() {
               <div className="text-sm text-muted-foreground">
                 1 MERE = $0.50 USD
               </div>
-              <div className="text-xs text-muted-foreground">
-                Or{" "}
-                <a href="/api/login" className="text-primary hover:underline">
-                  continue with Replit Auth
-                </a>
-              </div>
             </div>
 
             <div className="relative w-full max-w-md mx-auto mb-12">
@@ -162,7 +156,7 @@ export default function Landing() {
           <Button
             size="lg"
             className="text-lg px-8 py-6 bg-gold-gradient hover:opacity-90 text-black font-bold"
-            onClick={() => window.location.href = "/api/login"}
+            onClick={() => window.location.href = "/signup"}
             data-testid="button-login-cta"
           >
             Get Started Now
