@@ -15,7 +15,7 @@ import { formatMERE, formatUSD } from "@/lib/constants";
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
-import { useLocation } from "wouter";
+import { useLocation, Redirect } from "wouter";
 
 interface AdminStats {
   totalUsers: number;
@@ -65,7 +65,6 @@ interface Season {
 export default function Admin() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [, setLocation] = useLocation();
   const [selectedMiner, setSelectedMiner] = useState<MinerType | null>(null);
   const [editMinerOpen, setEditMinerOpen] = useState(false);
   const [minerFormData, setMinerFormData] = useState<Partial<MinerType>>({});
@@ -90,17 +89,16 @@ export default function Admin() {
     enabled: user?.isAdmin || false,
   });
 
-  // Redirect non-admin users
+  // Show toast for non-admin users
   useEffect(() => {
     if (user && !user.isAdmin) {
-      setLocation("/");
       toast({
         title: "Access Denied",
         description: "You don't have permission to access the admin dashboard.",
         variant: "destructive",
       });
     }
-  }, [user, setLocation, toast]);
+  }, [user, toast]);
 
   // Show loading state while checking auth
   if (!user) {
@@ -114,9 +112,9 @@ export default function Admin() {
     );
   }
 
-  // Don't render anything if user is not admin (they'll be redirected)
+  // Redirect non-admin users
   if (!user.isAdmin) {
-    return null;
+    return <Redirect to="/" />;
   }
 
   const toggleAdminMutation = useMutation({
