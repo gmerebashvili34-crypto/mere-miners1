@@ -80,11 +80,11 @@ export function MiningSlot({
         <Button
           size="icon"
           variant="ghost"
-          className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/70 hover:bg-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+          className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-black/50 hover:bg-destructive transition-colors"
           onClick={() => onRemoveMiner(miner.id)}
           data-testid={`button-remove-miner-${miner.id}`}
         >
-          <X className="w-4 h-4 text-white" />
+          <X className="w-3.5 h-3.5 text-white" />
         </Button>
       )}
 
