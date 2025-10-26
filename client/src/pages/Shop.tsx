@@ -185,7 +185,7 @@ export default function Shop() {
                     
                     <div className="text-muted-foreground">Daily Yield:</div>
                     <div className="font-semibold text-right text-primary">
-                      {formatMERE(parseFloat(selectedMiner.dailyYieldMere) * purchaseAmount)} MERE
+                      {formatMERE(parseFloat(selectedMiner.dailyYieldMere) * purchaseAmount)}
                     </div>
                   </div>
                 </Card>
@@ -198,10 +198,10 @@ export default function Shop() {
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
                       <div className="text-muted-foreground">Original Price:</div>
-                      <div className="text-right line-through">{formatMERE(cost.originalPrice)} MERE</div>
+                      <div className="text-right line-through">{formatMERE(cost.originalPrice)}</div>
                       
                       <div className="text-muted-foreground">Discount ({cost.discountPercent.toFixed(1)}%):</div>
-                      <div className="text-right text-primary">-{formatMERE(cost.originalPrice - cost.finalPrice)} MERE</div>
+                      <div className="text-right text-primary">-{formatMERE(cost.originalPrice - cost.finalPrice)}</div>
                     </div>
                   </Card>
                 )}
@@ -211,7 +211,7 @@ export default function Shop() {
                     <span className="font-semibold">Final Price:</span>
                     <div className="text-right">
                       <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
-                        {formatMERE(cost.finalPrice)} MERE
+                        {formatMERE(cost.finalPrice)}
                       </div>
                       <div className="text-xs text-muted-foreground">
                         ≈ {formatUSD(mereToUSD(cost.finalPrice))}
@@ -274,16 +274,16 @@ export default function Shop() {
             <Card className="p-4 space-y-3 bg-accent/20">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <div className="text-muted-foreground">Base Price:</div>
-                <div className="text-right">{formatMERE(bulkCalculation.originalPrice)} MERE</div>
+                <div className="text-right">{formatMERE(bulkCalculation.originalPrice)}</div>
                 
                 <div className="text-muted-foreground">Discount:</div>
                 <div className="text-right text-primary font-semibold">
-                  {bulkCalculation.discountPercent.toFixed(2)}% (-{formatMERE(bulkCalculation.discount)} MERE)
+                  {bulkCalculation.discountPercent.toFixed(2)}% (-{formatMERE(bulkCalculation.discount)})
                 </div>
                 
                 <div className="text-muted-foreground font-semibold pt-2 border-t border-border">Final Price:</div>
                 <div className="text-right font-bold text-lg bg-gold-gradient bg-clip-text text-transparent pt-2 border-t border-border">
-                  {formatMERE(bulkCalculation.finalPrice)} MERE
+                  {formatMERE(bulkCalculation.finalPrice)}
                 </div>
               </div>
             </Card>
