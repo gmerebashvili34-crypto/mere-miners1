@@ -7,6 +7,7 @@ import { db } from "./db";
 import { achievements, userAchievements } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
+import { getReferralStats } from "./referralService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -423,6 +424,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching achievements:", error);
       res.status(500).json({ message: "Failed to fetch achievements" });
+    }
+  });
+
+  // Referral routes
+  app.get('/api/referrals', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await getReferralStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching referral stats:", error);
+      res.status(500).json({ message: "Failed to fetch referral stats" });
     }
   });
 

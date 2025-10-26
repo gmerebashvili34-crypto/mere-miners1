@@ -8,6 +8,9 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import { db } from "./db";
+import { users } from "@shared/schema";
+import { eq } from "drizzle-orm";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -58,8 +61,12 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  // Generate referral code if it doesn't exist
-  const referralCode = `MERE${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  // Check if user already exists
+  const existingUser = await storage.getUser(claims["sub"]);
+  
+  // Only generate referral code if user doesn't have one
+  const userReferralCode = existingUser?.referralCode || 
+    `MERE${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
   
   await storage.upsertUser({
     id: claims["sub"],
@@ -67,7 +74,7 @@ async function upsertUser(
     firstName: claims["first_name"],
     lastName: claims["last_name"],
     profileImageUrl: claims["profile_image_url"],
-    referralCode,
+    referralCode: userReferralCode,
   });
 }
 
@@ -85,6 +92,7 @@ export async function setupAuth(app: Express) {
   ) => {
     const user = {};
     updateUserSession(user, tokens);
+    // Note: Referral code will be handled in the callback route
     await upsertUser(tokens.claims());
     verified(null, user);
   };
@@ -106,17 +114,51 @@ export async function setupAuth(app: Express) {
   passport.serializeUser((user: Express.User, cb) => cb(null, user));
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
-  app.get("/api/login", (req, res, next) => {
+  app.get("/api/login", (req: any, res, next) => {
+    // Store referral code in session if provided in query params
+    if (req.query.ref && typeof req.query.ref === 'string') {
+      req.session.referralCode = req.query.ref;
+    }
+    
     passport.authenticate(`replitauth:${req.hostname}`, {
       prompt: "login consent",
       scope: ["openid", "email", "profile", "offline_access"],
     })(req, res, next);
   });
 
-  app.get("/api/callback", (req, res, next) => {
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+  app.get("/api/callback", (req: any, res, next) => {
+    passport.authenticate(`replitauth:${req.hostname}`, async (err: any, user: any, info: any) => {
+      if (err) return next(err);
+      if (!user) return res.redirect("/api/login");
+      
+      // Handle referral code linking if present in session
+      if (req.session?.referralCode && user?.claims?.sub) {
+        const referralCode = req.session.referralCode;
+        const currentUser = await storage.getUser(user.claims.sub);
+        
+        // Security: Only link referral once and prevent self-referral
+        if (currentUser && !currentUser.referredById) {
+          const referrer = await storage.getUserByReferralCode(referralCode);
+          
+          // Prevent self-referral
+          if (referrer && referrer.id !== user.claims.sub) {
+            // Update the newly created/logged in user with referredById
+            await db.update(users).set({
+              referredById: referrer.id,
+            }).where(eq(users.id, user.claims.sub));
+            
+            // Increment referrer's count (only once)
+            await storage.incrementReferralCount(referrer.id);
+          }
+        }
+        
+        delete req.session.referralCode;
+      }
+      
+      req.logIn(user, (err: any) => {
+        if (err) return next(err);
+        return res.redirect("/");
+      });
     })(req, res, next);
   });
 

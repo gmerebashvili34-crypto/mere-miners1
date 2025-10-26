@@ -2,6 +2,7 @@ import { db } from "./db";
 import { users, userMiners, transactions, leaderboardEntries, minerTypes } from "@shared/schema";
 import { eq, and, isNotNull, sql } from "drizzle-orm";
 import { TH_DAILY_YIELD_MERE } from "@shared/constants";
+import { creditReferralBonus } from "./referralService";
 
 export class EarningsEngine {
   private intervalId: NodeJS.Timeout | null = null;
@@ -166,6 +167,9 @@ export class EarningsEngine {
           });
 
           console.log(`💰 Credited ${roundedEarnings.toFixed(8)} MERE to user ${userId}`);
+
+          // Credit referral bonus to referrer (if applicable)
+          await creditReferralBonus(userId, roundedEarnings);
         } catch (error) {
           console.error(`❌ Failed to credit earnings for user ${userId}:`, error);
           // If transaction fails, lastEarningsUpdate is NOT updated, so earnings will be retried next cycle

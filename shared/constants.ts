@@ -6,6 +6,7 @@ export const TH_BASE_PRICE_MERE = 27.98; // Base price per 1 TH/s in MERE
 export const TH_DAILY_YIELD_MERE = 0.16; // Daily yield per 1 TH/s in MERE
 export const DEFAULT_SLOTS = 6; // Default number of mining slots
 export const SLOT_EXPANSION_PRICE_MERE = 50; // Cost to unlock one additional slot
+export const REFERRAL_BONUS_PERCENT = 10; // Referrer earns 10% of referee's mining earnings
 
 // Formatting helpers
 export function formatMERE(amount: number | string): string {

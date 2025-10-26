@@ -30,8 +30,10 @@ import { eq, and, desc, sql } from "drizzle-orm";
 export interface IStorage {
   // User operations (required for Replit Auth)
   getUser(id: string): Promise<User | undefined>;
+  getUserByReferralCode(referralCode: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amountMere: string, operation: "add" | "subtract"): Promise<void>;
+  incrementReferralCount(userId: string): Promise<void>;
   
   // Miner Type operations
   getMinerTypes(): Promise<MinerType[]>;
@@ -73,6 +75,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByReferralCode(referralCode: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.referralCode, referralCode));
+    return user;
+  }
+
   async upsertUser(userData: UpsertUser): Promise<User> {
     const [user] = await db
       .insert(users)
@@ -110,6 +117,16 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(users.id, userId));
     }
+  }
+
+  async incrementReferralCount(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({
+        totalReferrals: sql`${users.totalReferrals} + 1`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
   }
 
   // Miner Type operations

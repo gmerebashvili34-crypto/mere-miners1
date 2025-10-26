@@ -35,6 +35,9 @@ export const users = pgTable("users", {
   mereBalance: numeric("mere_balance", { precision: 20, scale: 8 }).notNull().default("0"),
   totalMined: numeric("total_mined", { precision: 20, scale: 8 }).notNull().default("0"),
   referralCode: varchar("referral_code").unique(),
+  referredById: varchar("referred_by_id").references((): any => users.id), // Who invited this user
+  totalReferrals: integer("total_referrals").notNull().default(0), // Count of successful referrals
+  totalReferralEarnings: numeric("total_referral_earnings", { precision: 20, scale: 8 }).notNull().default("0"), // Total MERE earned from referrals
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
