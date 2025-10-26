@@ -627,6 +627,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Daily Games routes
+  app.get('/api/games/daily-spin/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      
+      const lastGame = await storage.getLastDailyGame(userId, 'daily_spin');
+      
+      if (!lastGame) {
+        return res.json({ 
+          canPlay: true, 
+          lastPlayedAt: null,
+          nextPlayAt: null 
+        });
+      }
+      
+      const lastPlayedAt = new Date(lastGame.lastPlayedAt);
+      const now = new Date();
+      const nextPlayAt = new Date(lastPlayedAt);
+      nextPlayAt.setHours(24, 0, 0, 0); // Next play at midnight
+      
+      const canPlay = now >= nextPlayAt;
+      
+      res.json({
+        canPlay,
+        lastPlayedAt: lastPlayedAt.toISOString(),
+        nextPlayAt: nextPlayAt.toISOString(),
+        lastReward: lastGame.rewardMere,
+      });
+    } catch (error) {
+      console.error("Error checking daily spin status:", error);
+      res.status(500).json({ message: "Failed to check game status" });
+    }
+  });
+
+  app.post('/api/games/daily-spin/play', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      
+      // Check if user can play
+      const lastGame = await storage.getLastDailyGame(userId, 'daily_spin');
+      
+      if (lastGame) {
+        const lastPlayedAt = new Date(lastGame.lastPlayedAt);
+        const now = new Date();
+        const nextPlayAt = new Date(lastPlayedAt);
+        nextPlayAt.setHours(24, 0, 0, 0);
+        
+        if (now < nextPlayAt) {
+          return res.status(400).json({ 
+            message: "You've already played today. Come back tomorrow!",
+            nextPlayAt: nextPlayAt.toISOString()
+          });
+        }
+      }
+      
+      // Generate random reward (5-50 MERE)
+      const rewards = [5, 10, 15, 20, 25, 30, 40, 50];
+      const rewardMere = rewards[Math.floor(Math.random() * rewards.length)].toString();
+      
+      // Play the game and credit reward
+      const game = await storage.playDailyGame(userId, 'daily_spin', rewardMere);
+      
+      res.json({
+        success: true,
+        reward: rewardMere,
+        playedAt: game.lastPlayedAt,
+      });
+    } catch (error) {
+      console.error("Error playing daily spin:", error);
+      res.status(500).json({ message: "Failed to play game" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

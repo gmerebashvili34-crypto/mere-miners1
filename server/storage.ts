@@ -8,6 +8,7 @@ import {
   leaderboardEntries,
   seasonPassRewards,
   userSeasonPass,
+  dailyGames,
   type User,
   type UpsertUser,
   type MinerType,
@@ -22,6 +23,7 @@ import {
   type InsertLeaderboardEntry,
   type SeasonPassReward,
   type UserSeasonPass,
+  type DailyGame,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql } from "drizzle-orm";
@@ -68,6 +70,10 @@ export interface IStorage {
   // Unlocking slots
   unlockSlot(userId: string): Promise<{ newSlotCount: number }>;
   getUserSlotCount(userId: string): Promise<number>;
+  
+  // Daily Games operations
+  getLastDailyGame(userId: string, gameType: string): Promise<DailyGame | undefined>;
+  playDailyGame(userId: string, gameType: string, rewardMere: string): Promise<DailyGame>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -414,6 +420,40 @@ export class DatabaseStorage implements IStorage {
   async getUserSlotCount(userId: string): Promise<number> {
     // Default slot count - could be extended to track per user
     return 6;
+  }
+
+  // Daily Games operations
+  async getLastDailyGame(userId: string, gameType: string): Promise<DailyGame | undefined> {
+    const [game] = await db
+      .select()
+      .from(dailyGames)
+      .where(
+        and(
+          eq(dailyGames.userId, userId),
+          eq(dailyGames.gameType, gameType)
+        )
+      )
+      .orderBy(desc(dailyGames.lastPlayedAt))
+      .limit(1);
+    return game;
+  }
+
+  async playDailyGame(userId: string, gameType: string, rewardMere: string): Promise<DailyGame> {
+    // Credit the user with reward MERE
+    await this.updateUserBalance(userId, rewardMere, "add");
+    
+    // Record the game play
+    const [game] = await db
+      .insert(dailyGames)
+      .values({
+        userId,
+        gameType,
+        lastPlayedAt: new Date(),
+        rewardMere,
+      })
+      .returning();
+    
+    return game;
   }
 }
 
