@@ -4,11 +4,12 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { calculateDiscountedPrice, TH_DAILY_YIELD_MERE, SLOT_EXPANSION_PRICE_MERE } from "@shared/constants";
 import { db } from "./db";
-import { achievements, userAchievements, users, minerTypes, userMiners, transactions, seasons } from "@shared/schema";
+import { achievements, userAchievements, users, minerTypes, userMiners, transactions, seasons, seasonPassRewards } from "@shared/schema";
 import { eq, sum, count, sql, isNotNull, and } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
 import { signUp, signIn, requireUserId } from "./emailAuth";
+import { tronService } from "./tronService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -375,10 +376,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/wallet/deposit/generate', isAuthenticated, async (req: any, res) => {
     try {
-      // In production, generate a unique TRC-20 address
-      // For demo, return a mock address
-      const mockAddress = `T${Math.random().toString(36).substring(2, 15).toUpperCase()}`;
-      res.json({ address: mockAddress });
+      // Return the platform wallet address for deposits
+      // Using single platform wallet (Option A)
+      const depositAddress = tronService.getPlatformWalletAddress();
+      res.json({ address: depositAddress });
     } catch (error) {
       console.error("Error generating deposit address:", error);
       res.status(500).json({ message: "Failed to generate deposit address" });
@@ -389,11 +390,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = requireUserId(req, res);
       if (!userId) return;
-      const { amountMere } = req.body;
+      const { amountMere, address } = req.body;
 
       const amount = parseFloat(amountMere);
       if (!amount || amount <= 0) {
         return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      if (!address || !address.trim()) {
+        return res.status(400).json({ message: "Withdrawal address is required" });
       }
 
       // Check balance
@@ -404,25 +409,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Calculate fee (2%)
       const fee = amount * 0.02;
-      const total = amount - fee;
+      const amountAfterFee = amount - fee;
+      
+      // Convert MERE to USDT (1 MERE = 0.5 USDT)
+      const usdtAmount = amountAfterFee * 0.5;
 
-      // Deduct from balance
+      // Deduct from balance first
       await storage.updateUserBalance(userId, amount.toString(), "subtract");
 
-      // Record transaction
-      await storage.createTransaction({
-        userId,
-        type: "withdrawal",
-        amountMere: amount.toString(),
-        amountUsd: (total * 0.5).toString(),
-        description: `Withdrawal (Fee: ${fee.toFixed(2)} MERE)`,
-        status: "pending",
-      });
+      try {
+        // Send USDT via TronGrid
+        console.log(`💸 Processing withdrawal: ${usdtAmount} USDT to ${address}`);
+        const txHash = await tronService.sendUSDT(address, usdtAmount);
+        
+        // Record successful transaction
+        await storage.createTransaction({
+          userId,
+          type: "withdrawal",
+          amountMere: amount.toString(),
+          amountUsd: usdtAmount.toFixed(2),
+          description: `Withdrawal (Fee: ${fee.toFixed(2)} MERE)`,
+          status: "completed",
+          txHash,
+        });
 
-      res.json({ success: true, amount: total });
-    } catch (error) {
+        res.json({ 
+          success: true, 
+          amount: amountAfterFee,
+          usdtAmount,
+          txHash,
+        });
+      } catch (blockchainError: any) {
+        // Refund the user if blockchain transaction fails
+        console.error("Blockchain withdrawal failed, refunding user:", blockchainError);
+        await storage.updateUserBalance(userId, amount.toString(), "add");
+        
+        // Record failed transaction
+        await storage.createTransaction({
+          userId,
+          type: "withdrawal",
+          amountMere: amount.toString(),
+          amountUsd: usdtAmount.toFixed(2),
+          description: `Failed withdrawal (Refunded): ${blockchainError.message}`,
+          status: "failed",
+        });
+        
+        throw blockchainError;
+      }
+    } catch (error: any) {
       console.error("Error processing withdrawal:", error);
-      res.status(500).json({ message: "Failed to process withdrawal" });
+      res.status(500).json({ message: error.message || "Failed to process withdrawal" });
     }
   });
 

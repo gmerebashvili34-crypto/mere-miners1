@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { earningsEngine } from "./earnings";
+import { depositMonitor } from "./depositMonitor";
 
 const app = express();
 
@@ -85,5 +86,8 @@ app.use((req, res, next) => {
     
     // Start earnings engine after server is listening
     earningsEngine.start();
+    
+    // Start deposit monitor for automatic USDT deposit detection
+    depositMonitor.start();
   });
 })();
