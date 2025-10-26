@@ -21,8 +21,8 @@ The game features a luxury black & gold theme with a primary gold color `#D4AF37
 - **Authentication:** Replit Auth (OIDC) integrated for secure user management and session handling.
 - **Core Features:**
     - **Authentication:** Replit Auth OIDC, auto-profile creation with referral codes.
-    - **Mining Room:** Visual slot grid (6-20 slots), drag-and-place miners, real-time stats (Hashrate, Daily Earnings).
-    - **Shop System:** 5 premium miner types with varying rarities and a bulk discount calculator.
+    - **Mining Room:** Visual slot grid (6-20 slots), drag-and-place miners, real-time stats (Hashrate, Daily Earnings), miner upgrades (5 levels max, flat 25.98 MERE/$12.99 USD per level, each level adds 20% hashrate).
+    - **Shop System:** 10 unique miner types, each purchasable only once per type (one-time purchase limit), fixed pricing with no bulk discounts.
     - **Wallet:** MERE token balance, mock USDT deposit, withdrawal system with fees, transaction history.
     - **Leaderboard:** Seasonal rankings based on MERE mined, top 3 podium, season countdown.
     - **Season Pass:** Free and Premium tracks with 20 tiers, claimable rewards, progress based on mining.
