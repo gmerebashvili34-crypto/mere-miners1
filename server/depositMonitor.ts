@@ -2,7 +2,7 @@ import { tronService } from './tronService';
 import { storage } from './storage';
 import { db } from './db';
 import { transactions } from '@shared/schema';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 class DepositMonitor {
   private isRunning: boolean = false;
@@ -19,12 +19,12 @@ class DepositMonitor {
    */
   private async loadLastProcessedTxId(): Promise<void> {
     try {
-      // Get the most recent deposit transaction by txHash
+      // Get the most recent deposit transaction by txHash (descending order = newest first)
       const [lastDeposit] = await db
         .select()
         .from(transactions)
         .where(eq(transactions.type, 'deposit'))
-        .orderBy(transactions.createdAt)
+        .orderBy(desc(transactions.createdAt))
         .limit(1);
 
       if (lastDeposit && lastDeposit.txHash) {
@@ -154,7 +154,9 @@ class DepositMonitor {
         }
       }
 
-      // Update last processed transaction ID
+      // Update last processed transaction ID to the newest one
+      // TronGrid API returns transactions in reverse chronological order (newest first)
+      // so deposits[0] is the most recent transaction
       if (deposits.length > 0) {
         this.lastProcessedTxId = deposits[0].txId;
       }
