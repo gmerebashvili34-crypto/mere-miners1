@@ -702,6 +702,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Lucky Draw game routes
+  app.get('/api/games/lucky-draw/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      
+      const lastGame = await storage.getLastDailyGame(userId, 'lucky_draw');
+      const hasPlayedBefore = await storage.hasPlayedGameBefore(userId, 'lucky_draw');
+      
+      if (!lastGame) {
+        return res.json({ 
+          canPlay: true, 
+          lastPlayedAt: null,
+          nextPlayAt: null,
+          isFirstPlay: !hasPlayedBefore
+        });
+      }
+      
+      const lastPlayedAt = new Date(lastGame.lastPlayedAt);
+      const now = new Date();
+      const nextPlayAt = new Date(lastPlayedAt);
+      nextPlayAt.setHours(24, 0, 0, 0);
+      
+      const canPlay = now >= nextPlayAt;
+      
+      res.json({
+        canPlay,
+        lastPlayedAt: lastPlayedAt.toISOString(),
+        nextPlayAt: nextPlayAt.toISOString(),
+        lastReward: lastGame.rewardMere,
+        lastRarity: lastGame.metadata?.rarity,
+        isFirstPlay: false
+      });
+    } catch (error) {
+      console.error("Error checking lucky draw status:", error);
+      res.status(500).json({ message: "Failed to check game status" });
+    }
+  });
+
+  app.post('/api/games/lucky-draw/play', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      
+      // Check if user can play
+      const lastGame = await storage.getLastDailyGame(userId, 'lucky_draw');
+      
+      if (lastGame) {
+        const lastPlayedAt = new Date(lastGame.lastPlayedAt);
+        const now = new Date();
+        const nextPlayAt = new Date(lastPlayedAt);
+        nextPlayAt.setHours(24, 0, 0, 0);
+        
+        if (now < nextPlayAt) {
+          return res.status(400).json({ 
+            message: "You've already played today. Come back tomorrow!",
+            nextPlayAt: nextPlayAt.toISOString()
+          });
+        }
+      }
+      
+      // Check if first play
+      const hasPlayedBefore = await storage.hasPlayedGameBefore(userId, 'lucky_draw');
+      
+      let rewardMere: string;
+      let rarity: string;
+      
+      if (!hasPlayedBefore) {
+        // First play always gives 0.01 MERE (Common)
+        rewardMere = '0.01';
+        rarity = 'common';
+      } else {
+        // Rarity-based rewards with weighted probabilities
+        const rand = Math.random() * 100;
+        
+        if (rand < 50) { // 50% chance - Common
+          rewardMere = (0.01 + Math.random() * 0.04).toFixed(2); // 0.01-0.05
+          rarity = 'common';
+        } else if (rand < 80) { // 30% chance - Rare
+          rewardMere = (0.05 + Math.random() * 0.10).toFixed(2); // 0.05-0.15
+          rarity = 'rare';
+        } else if (rand < 95) { // 15% chance - Epic
+          rewardMere = (0.15 + Math.random() * 0.15).toFixed(2); // 0.15-0.30
+          rarity = 'epic';
+        } else { // 5% chance - Legendary
+          rewardMere = (0.30 + Math.random() * 0.20).toFixed(2); // 0.30-0.50
+          rarity = 'legendary';
+        }
+      }
+      
+      // Play the game and credit reward
+      const game = await storage.playDailyGame(userId, 'lucky_draw', rewardMere, { rarity });
+      
+      res.json({
+        success: true,
+        reward: rewardMere,
+        rarity,
+        playedAt: game.lastPlayedAt,
+        isFirstPlay: !hasPlayedBefore
+      });
+    } catch (error) {
+      console.error("Error playing lucky draw:", error);
+      res.status(500).json({ message: "Failed to play game" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

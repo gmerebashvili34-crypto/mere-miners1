@@ -73,7 +73,8 @@ export interface IStorage {
   
   // Daily Games operations
   getLastDailyGame(userId: string, gameType: string): Promise<DailyGame | undefined>;
-  playDailyGame(userId: string, gameType: string, rewardMere: string): Promise<DailyGame>;
+  hasPlayedGameBefore(userId: string, gameType: string): Promise<boolean>;
+  playDailyGame(userId: string, gameType: string, rewardMere: string, metadata?: any): Promise<DailyGame>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -438,7 +439,21 @@ export class DatabaseStorage implements IStorage {
     return game;
   }
 
-  async playDailyGame(userId: string, gameType: string, rewardMere: string): Promise<DailyGame> {
+  async hasPlayedGameBefore(userId: string, gameType: string): Promise<boolean> {
+    const games = await db
+      .select({ id: dailyGames.id })
+      .from(dailyGames)
+      .where(
+        and(
+          eq(dailyGames.userId, userId),
+          eq(dailyGames.gameType, gameType)
+        )
+      )
+      .limit(1);
+    return games.length > 0;
+  }
+
+  async playDailyGame(userId: string, gameType: string, rewardMere: string, metadata?: any): Promise<DailyGame> {
     // Credit the user with reward MERE
     await this.updateUserBalance(userId, rewardMere, "add");
     
@@ -450,6 +465,7 @@ export class DatabaseStorage implements IStorage {
         gameType,
         lastPlayedAt: new Date(),
         rewardMere,
+        metadata: metadata || null,
       })
       .returning();
     

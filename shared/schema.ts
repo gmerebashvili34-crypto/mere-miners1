@@ -281,9 +281,10 @@ export type UserAchievement = typeof userAchievements.$inferSelect;
 export const dailyGames = pgTable("daily_games", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  gameType: varchar("game_type").notNull(), // "daily_spin", etc.
+  gameType: varchar("game_type").notNull(), // "daily_spin", "lucky_draw", "miner_match", etc.
   lastPlayedAt: timestamp("last_played_at").notNull(),
   rewardMere: numeric("reward_mere", { precision: 10, scale: 2 }).notNull(),
+  metadata: jsonb("metadata"), // Additional game-specific data (rarity, score, etc.)
   createdAt: timestamp("created_at").defaultNow(),
 });
 
