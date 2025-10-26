@@ -276,3 +276,22 @@ export const insertUserAchievementSchema = createInsertSchema(userAchievements).
 
 export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
 export type UserAchievement = typeof userAchievements.$inferSelect;
+
+// Daily Games (mini-games playable once per day)
+export const dailyGames = pgTable("daily_games", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  gameType: varchar("game_type").notNull(), // "daily_spin", etc.
+  lastPlayedAt: timestamp("last_played_at").notNull(),
+  rewardMere: numeric("reward_mere", { precision: 10, scale: 2 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const dailyGamesRelations = relations(dailyGames, ({ one }) => ({
+  user: one(users, {
+    fields: [dailyGames.userId],
+    references: [users.id],
+  }),
+}));
+
+export type DailyGame = typeof dailyGames.$inferSelect;
