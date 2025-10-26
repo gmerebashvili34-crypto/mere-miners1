@@ -732,7 +732,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastPlayedAt: lastPlayedAt.toISOString(),
         nextPlayAt: nextPlayAt.toISOString(),
         lastReward: lastGame.rewardMere,
-        lastRarity: lastGame.metadata?.rarity,
+        lastRarity: (lastGame.metadata as any)?.rarity,
         isFirstPlay: false
       });
     } catch (error) {
@@ -836,7 +836,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastPlayedAt: lastPlayedAt.toISOString(),
         nextPlayAt: nextPlayAt.toISOString(),
         lastReward: lastGame.rewardMere,
-        lastMoves: lastGame.metadata?.moves,
+        lastMoves: (lastGame.metadata as any)?.moves,
       });
     } catch (error) {
       console.error("Error checking miner match status:", error);
