@@ -684,9 +684,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Generate random reward (5-50 MERE)
-      const rewards = [5, 10, 15, 20, 25, 30, 40, 50];
-      const rewardMere = rewards[Math.floor(Math.random() * rewards.length)].toString();
+      // Generate random reward (0.01-0.05 MERE)
+      const rewardMere = (0.01 + Math.random() * 0.04).toFixed(2);
       
       // Play the game and credit reward
       const game = await storage.playDailyGame(userId, 'daily_spin', rewardMere);
@@ -774,20 +773,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         rewardMere = '0.01';
         rarity = 'common';
       } else {
-        // Rarity-based rewards with weighted probabilities
+        // Rarity-based rewards with weighted probabilities (0.01-0.07 MERE)
         const rand = Math.random() * 100;
         
         if (rand < 50) { // 50% chance - Common
-          rewardMere = (0.01 + Math.random() * 0.04).toFixed(2); // 0.01-0.05
+          rewardMere = (0.01 + Math.random() * 0.01).toFixed(2); // 0.01-0.02
           rarity = 'common';
         } else if (rand < 80) { // 30% chance - Rare
-          rewardMere = (0.05 + Math.random() * 0.10).toFixed(2); // 0.05-0.15
+          rewardMere = (0.02 + Math.random() * 0.02).toFixed(2); // 0.02-0.04
           rarity = 'rare';
         } else if (rand < 95) { // 15% chance - Epic
-          rewardMere = (0.15 + Math.random() * 0.15).toFixed(2); // 0.15-0.30
+          rewardMere = (0.04 + Math.random() * 0.02).toFixed(2); // 0.04-0.06
           rarity = 'epic';
         } else { // 5% chance - Legendary
-          rewardMere = (0.30 + Math.random() * 0.20).toFixed(2); // 0.30-0.50
+          rewardMere = (0.06 + Math.random() * 0.01).toFixed(2); // 0.06-0.07
           rarity = 'legendary';
         }
       }
@@ -869,15 +868,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { moves } = req.body;
       
       // Calculate reward based on moves (fewer moves = better reward)
-      // Perfect game (12 moves = 6 pairs) = 0.5 MERE
+      // Perfect game (12 moves = 6 pairs) = 0.08 MERE
       // Each extra move reduces reward by 0.01 MERE, minimum 0.01 MERE
       let rewardMere: string;
       if (moves <= 12) {
-        rewardMere = '0.50';
+        rewardMere = '0.08';
       } else {
         const extraMoves = moves - 12;
         const penalty = extraMoves * 0.01;
-        const reward = Math.max(0.01, 0.5 - penalty);
+        const reward = Math.max(0.01, 0.08 - penalty);
         rewardMere = reward.toFixed(2);
       }
       
