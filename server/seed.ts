@@ -163,23 +163,25 @@ async function seed() {
   }).returning();
   console.log("✓ Season created");
 
-  // Create premium-only season pass rewards (balanced at 999 MERE cost, 1290 MERE total rewards = 30% profit)
+  // Create premium-only season pass rewards (balanced at 999 MERE cost, 1290 MERE total rewards = 30% profit + 10 TH/s)
   const rewards = [];
   const rewardAmounts = [30, 40, 50, 60, 0, 65, 70, 75, 80, 0, 85, 90, 95, 100, 0, 105, 110, 115, 120, 0];
+  const thBoosts = [0, 0, 0, 0, 2, 0, 0, 0, 0, 2.5, 0, 0, 0, 0, 2.5, 0, 0, 0, 0, 3]; // Total: 10 TH/s
   
   for (let tier = 0; tier < 20; tier++) {
     const rewardAmount = rewardAmounts[tier];
+    const thBoost = thBoosts[tier];
     
-    // Premium rewards - mix of MERE and special rewards
+    // Premium rewards - mix of MERE and TH/s boosts
     rewards.push({
       seasonId: season.id,
       tier,
       isPremium: true,
-      rewardType: tier % 5 === 4 ? "booster" : "mere",
-      rewardValue: tier % 5 === 4 ? "0.25" : rewardAmount.toString(), // 25% boost every 5 tiers
+      rewardType: thBoost > 0 ? "booster" : "mere",
+      rewardValue: thBoost > 0 ? thBoost.toString() : rewardAmount.toString(),
       rewardMetadata: {
-        name: tier % 5 === 4 ? "Hashrate Boost +25%" : `${rewardAmount} MERE`,
-        description: tier % 5 === 4 ? "Permanent +25% boost to all miners" : "Instant MERE reward",
+        name: thBoost > 0 ? `+${thBoost} TH/s Boost` : `${rewardAmount} MERE`,
+        description: thBoost > 0 ? "Permanent hashrate boost to all miners" : "Instant MERE reward",
       },
     });
   }

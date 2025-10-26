@@ -247,7 +247,7 @@ export default function SeasonPass() {
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />
-                <span>Unlock +25% hashrate boosts every 5 tiers</span>
+                <span>Unlock +10 TH/s total hashrate boosts</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />
