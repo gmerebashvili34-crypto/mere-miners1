@@ -11,7 +11,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { formatMERE, formatUSD, mereToUSD, calculateDiscountedPrice, TH_BASE_PRICE_MERE } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { MinerType } from "@shared/schema";
+import type { MinerType, UserMiner } from "@shared/schema";
 import {
   Dialog,
   DialogContent,
@@ -25,9 +25,13 @@ export default function Shop() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [selectedMiner, setSelectedMiner] = useState<MinerType | null>(null);
-  const [purchaseAmount, setPurchaseAmount] = useState(1);
   const [showBulkCalculator, setShowBulkCalculator] = useState(false);
   const [bulkTH, setBulkTH] = useState(10);
+  
+  // Fetch user's owned miners to check what they already have
+  const { data: ownedMiners = [] } = useQuery<(UserMiner & { minerType: MinerType })[]>({
+    queryKey: ["/api/mining/room"],
+  });
 
   // Fetch available miners
   const { data: miners = [], isLoading } = useQuery<MinerType[]>({
@@ -36,17 +40,16 @@ export default function Shop() {
 
   // Purchase miner mutation
   const purchaseMutation = useMutation({
-    mutationFn: async ({ minerTypeId, quantity }: { minerTypeId: string; quantity: number }) => {
-      await apiRequest("POST", "/api/shop/buy", { minerTypeId, quantity });
+    mutationFn: async ({ minerTypeId }: { minerTypeId: string }) => {
+      await apiRequest("POST", "/api/shop/buy", { minerTypeId, quantity: 1 });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       queryClient.invalidateQueries({ queryKey: ["/api/mining/room"] });
       setSelectedMiner(null);
-      setPurchaseAmount(1);
       toast({
         title: "Purchase Successful!",
-        description: "Your miners have been added to your inventory",
+        description: "Miner added to your inventory",
       });
     },
     onError: (error: Error) => {
@@ -67,20 +70,21 @@ export default function Shop() {
     
     purchaseMutation.mutate({
       minerTypeId: selectedMiner.id,
-      quantity: purchaseAmount,
     });
   };
+  
+  // Check if user already owns this miner type
+  const ownsSelectedMiner = selectedMiner && ownedMiners.some(m => m.minerType.id === selectedMiner.id);
 
   const getTotalCost = () => {
     if (!selectedMiner) return { originalPrice: 0, finalPrice: 0, discountPercent: 0 };
-    const totalTH = selectedMiner.thRate * purchaseAmount;
-    const pricePerTH = parseFloat(selectedMiner.basePriceMere) / selectedMiner.thRate;
-    const calculatedPrice = calculateDiscountedPrice(totalTH);
+    // Each miner is purchasable only once (quantity = 1)
+    const pricePerUnit = parseFloat(selectedMiner.basePriceMere);
     
     return {
-      originalPrice: totalTH * pricePerTH,
-      finalPrice: calculatedPrice.finalPrice,
-      discountPercent: calculatedPrice.discountPercent,
+      originalPrice: pricePerUnit,
+      finalPrice: pricePerUnit,
+      discountPercent: 0,
     };
   };
 
@@ -164,51 +168,34 @@ export default function Shop() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Quantity</label>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={purchaseAmount}
-                onChange={(e) => setPurchaseAmount(Math.max(1, parseInt(e.target.value) || 1))}
-                data-testid="input-purchase-quantity"
-              />
-            </div>
+            {ownsSelectedMiner && (
+              <Card className="p-4 bg-destructive/10 border-destructive/30">
+                <div className="text-sm text-destructive text-center font-semibold">
+                  You already own this miner type. Each miner can only be purchased once.
+                </div>
+              </Card>
+            )}
 
             {selectedMiner && (
               <div className="space-y-3">
                 <Card className="p-4 bg-accent/20">
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="text-muted-foreground">Total Hash Rate:</div>
-                    <div className="font-semibold text-right">{(selectedMiner.thRate * purchaseAmount).toFixed(2)} TH/s</div>
+                    <div className="text-muted-foreground">Hash Rate:</div>
+                    <div className="font-semibold text-right">{selectedMiner.thRate.toFixed(2)} TH/s</div>
                     
                     <div className="text-muted-foreground">Daily Yield:</div>
                     <div className="font-semibold text-right text-primary">
-                      {formatMERE(parseFloat(selectedMiner.dailyYieldMere) * purchaseAmount)}
+                      {formatMERE(parseFloat(selectedMiner.dailyYieldMere))}
                     </div>
+                    
+                    <div className="text-muted-foreground">Rarity:</div>
+                    <div className="font-semibold text-right capitalize">{selectedMiner.rarity}</div>
                   </div>
                 </Card>
 
-                {cost.discountPercent > 0 && (
-                  <Card className="p-4 bg-primary/10 border-primary/30">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Sparkles className="w-4 h-4 text-primary" />
-                      <span className="font-semibold text-primary">Bulk Discount Applied!</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="text-muted-foreground">Original Price:</div>
-                      <div className="text-right line-through">{formatMERE(cost.originalPrice)}</div>
-                      
-                      <div className="text-muted-foreground">Discount ({cost.discountPercent.toFixed(1)}%):</div>
-                      <div className="text-right text-primary">-{formatMERE(cost.originalPrice - cost.finalPrice)}</div>
-                    </div>
-                  </Card>
-                )}
-
                 <Card className="p-4 bg-card border-primary/50">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">Final Price:</span>
+                    <span className="font-semibold">Price:</span>
                     <div className="text-right">
                       <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
                         {formatMERE(cost.finalPrice)}
@@ -235,11 +222,11 @@ export default function Shop() {
             </Button>
             <Button
               onClick={confirmPurchase}
-              disabled={!canAfford || purchaseMutation.isPending}
+              disabled={!canAfford || purchaseMutation.isPending || ownsSelectedMiner}
               className="bg-gold-gradient text-black font-bold"
               data-testid="button-confirm-purchase"
             >
-              {purchaseMutation.isPending ? "Processing..." : "Confirm Purchase"}
+              {purchaseMutation.isPending ? "Processing..." : ownsSelectedMiner ? "Already Owned" : "Confirm Purchase"}
             </Button>
           </DialogFooter>
         </DialogContent>

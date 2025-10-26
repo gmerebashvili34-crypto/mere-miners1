@@ -196,23 +196,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upgradeMiner(minerId: string, userId: string): Promise<{ newLevel: number; cost: number }> {
-    // Get the miner
-    const [miner] = await db
+    // Get the miner with its type
+    const result = await db
       .select()
       .from(userMiners)
-      .where(and(eq(userMiners.id, minerId), eq(userMiners.userId, userId)));
+      .innerJoin(minerTypes, eq(userMiners.minerTypeId, minerTypes.id))
+      .where(and(eq(userMiners.id, minerId), eq(userMiners.userId, userId)))
+      .limit(1);
 
-    if (!miner) {
+    if (result.length === 0) {
       throw new Error("Miner not found");
     }
+
+    const miner = result[0].user_miners;
+    const minerType = result[0].miner_types;
 
     const currentLevel = miner.upgradeLevel;
     if (currentLevel >= 5) {
       throw new Error("Miner is already at max level");
     }
 
-    // Calculate upgrade cost (exponential: 50, 100, 200, 400, 800 MERE)
-    const upgradeCost = 50 * Math.pow(2, currentLevel);
+    // Calculate upgrade cost based on TH/s increase
+    // 1 TH/s = 25.98 MERE ($12.99)
+    // Each level adds 20% hashrate
+    const thIncrease = minerType.thRate * 0.2;
+    const upgradeCost = thIncrease * 25.98;
 
     // Check if user has enough balance
     const [user] = await db.select().from(users).where(eq(users.id, userId));
@@ -222,11 +230,11 @@ export class DatabaseStorage implements IStorage {
 
     const balance = parseFloat(user.mereBalance);
     if (balance < upgradeCost) {
-      throw new Error(`Insufficient balance. Need ${upgradeCost} MERE`);
+      throw new Error(`Insufficient balance. Need ${upgradeCost.toFixed(2)} MERE`);
     }
 
     // Deduct cost from user balance
-    await this.updateUserBalance(userId, upgradeCost.toString(), "subtract");
+    await this.updateUserBalance(userId, upgradeCost.toFixed(2), "subtract");
 
     // Upgrade the miner
     const newLevel = currentLevel + 1;
@@ -239,9 +247,9 @@ export class DatabaseStorage implements IStorage {
     await this.createTransaction({
       userId,
       type: "purchase",
-      amountMere: (-upgradeCost).toString(),
-      amountUsd: null,
-      description: `Upgraded miner to level ${newLevel}`,
+      amountMere: upgradeCost.toFixed(2),
+      amountUsd: (upgradeCost * 0.5).toFixed(2),
+      description: `Upgraded ${minerType.name} to level ${newLevel}`,
       status: "completed",
       metadata: { minerId, oldLevel: currentLevel, newLevel },
     });
