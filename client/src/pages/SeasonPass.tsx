@@ -103,7 +103,7 @@ export default function SeasonPass() {
   const canClaim = (tier: number) => currentTier >= tier;
   const isClaimed = (rewardId: string) => claimedRewards.includes(rewardId);
   
-  const upgradeCost = 200;
+  const upgradeCost = 999;
   const canAffordUpgrade = user && parseFloat(user.mereBalance) >= upgradeCost;
 
   return (
@@ -135,7 +135,7 @@ export default function SeasonPass() {
                 className="bg-gold-gradient text-black font-bold"
                 data-testid="button-upgrade-premium"
               >
-                {canAffordUpgrade ? "Upgrade (200 MERE)" : "Insufficient Balance"}
+                {canAffordUpgrade ? "Upgrade (999 MERE)" : "Insufficient Balance"}
               </Button>
             )}
           </div>
@@ -261,7 +261,7 @@ export default function SeasonPass() {
               size="lg"
               data-testid="button-upgrade-premium-cta"
             >
-              {canAffordUpgrade ? "Activate Premium (200 MERE)" : "Insufficient Balance (Need 200 MERE)"}
+              {canAffordUpgrade ? "Activate Premium (999 MERE)" : "Insufficient Balance (Need 999 MERE)"}
             </Button>
           </Card>
         )}
