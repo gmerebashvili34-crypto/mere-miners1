@@ -69,7 +69,7 @@ export default function Leaderboard() {
           <div className="flex items-center justify-between">
             <h1 className="font-display font-bold text-2xl bg-gold-gradient bg-clip-text text-transparent flex items-center gap-2">
               <Trophy className="w-6 h-6 text-primary" />
-              Leaderboard
+              Ranks
             </h1>
             {season && (
               <div className="text-right">
