@@ -1,9 +1,9 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Zap, TrendingUp, Clock } from "lucide-react";
+import { Zap, TrendingUp } from "lucide-react";
 import type { MinerType } from "@shared/schema";
-import { formatMERE, formatUSD, mereToUSD } from "@/lib/constants";
+import { formatMERE } from "@/lib/constants";
 
 interface MinerCardProps {
   miner: MinerType;
@@ -86,17 +86,6 @@ export function MinerCard({ miner, onPurchase, isPurchasing, showPurchaseButton 
                 {formatMERE(miner.dailyYieldMere)}
               </div>
             </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 text-sm p-2 rounded-md bg-accent/50">
-          <Clock className="w-4 h-4 text-muted-foreground" />
-          <div className="flex-1">
-            <span className="text-xs text-muted-foreground">ROI: </span>
-            <span className="font-semibold text-foreground">{miner.roiDays} days</span>
-            <span className="text-xs text-muted-foreground ml-2">
-              (~{((365 / miner.roiDays) * 100).toFixed(0)}% APR)
-            </span>
           </div>
         </div>
 
