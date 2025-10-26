@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { BottomNav } from "@/components/BottomNav";
-import { Shield, Users, Cpu, Calendar, TrendingUp, DollarSign, Package, Activity, Edit, Check, X } from "lucide-react";
+import { Shield, Users, Cpu, Calendar, TrendingUp, DollarSign, Package, Activity, Edit, Check, X, AlertTriangle } from "lucide-react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { formatMERE, formatUSD } from "@/lib/constants";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { useLocation } from "wouter";
 
 interface AdminStats {
   totalUsers: number;
@@ -62,25 +64,60 @@ interface Season {
 
 export default function Admin() {
   const { toast } = useToast();
+  const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [selectedMiner, setSelectedMiner] = useState<MinerType | null>(null);
   const [editMinerOpen, setEditMinerOpen] = useState(false);
   const [minerFormData, setMinerFormData] = useState<Partial<MinerType>>({});
 
   const { data: stats } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
+    enabled: user?.isAdmin || false,
   });
 
   const { data: users } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+    enabled: user?.isAdmin || false,
   });
 
   const { data: miners } = useQuery<MinerType[]>({
     queryKey: ["/api/admin/miners"],
+    enabled: user?.isAdmin || false,
   });
 
   const { data: seasons } = useQuery<Season[]>({
     queryKey: ["/api/admin/seasons"],
+    enabled: user?.isAdmin || false,
   });
+
+  // Redirect non-admin users
+  useEffect(() => {
+    if (user && !user.isAdmin) {
+      setLocation("/");
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to access the admin dashboard.",
+        variant: "destructive",
+      });
+    }
+  }, [user, setLocation, toast]);
+
+  // Show loading state while checking auth
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="text-primary font-semibold">Verifying access...</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render anything if user is not admin (they'll be redirected)
+  if (!user.isAdmin) {
+    return null;
+  }
 
   const toggleAdminMutation = useMutation({
     mutationFn: async ({ userId, isAdmin }: { userId: string; isAdmin: boolean }) => {

@@ -1,8 +1,10 @@
 import { Link, useLocation } from "wouter";
-import { Home, ShoppingBag, Trophy, Star, User } from "lucide-react";
+import { Home, ShoppingBag, Trophy, Star, User, Shield } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 export function BottomNav() {
   const [location] = useLocation();
+  const { user } = useAuth();
 
   const navItems = [
     { icon: Home, label: "Mine", path: "/", testId: "nav-mining" },
@@ -12,10 +14,17 @@ export function BottomNav() {
     { icon: User, label: "Profile", path: "/profile", testId: "nav-profile" },
   ];
 
+  // Add Admin link only for admin users
+  const allNavItems = user?.isAdmin
+    ? [...navItems, { icon: Shield, label: "Admin", path: "/admin", testId: "nav-admin" }]
+    : navItems;
+
+  const gridCols = user?.isAdmin ? "grid-cols-6" : "grid-cols-5";
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-pb">
-      <div className="max-w-md mx-auto grid grid-cols-5 h-16">
-        {navItems.map(({ icon: Icon, label, path, testId }) => {
+      <div className={`max-w-md mx-auto grid ${gridCols} h-16`}>
+        {allNavItems.map(({ icon: Icon, label, path, testId }) => {
           const isActive = location === path;
           return (
             <Link key={path} href={path}>
