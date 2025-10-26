@@ -73,10 +73,8 @@ export function MiningSlot({
   const isActive = miner.isActive;
   const upgradeLevel = miner.upgradeLevel || 0;
   const maxLevel = 5;
-  // Upgrade cost based on TH/s increase: 1 TH/s = 25.98 MERE
-  // Each level adds 20% hashrate, so cost = base_hashrate * 0.2 * 25.98
-  const thIncrease = miner.minerType.thRate * 0.2;
-  const upgradeCost = upgradeLevel < maxLevel ? thIncrease * 25.98 : 0;
+  // Flat upgrade cost: $12.99 USD = 25.98 MERE for all miners
+  const upgradeCost = upgradeLevel < maxLevel ? 25.98 : 0;
 
   return (
     <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group">

@@ -216,11 +216,8 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Miner is already at max level");
     }
 
-    // Calculate upgrade cost based on TH/s increase
-    // 1 TH/s = 25.98 MERE ($12.99)
-    // Each level adds 20% hashrate
-    const thIncrease = minerType.thRate * 0.2;
-    const upgradeCost = thIncrease * 25.98;
+    // Flat upgrade cost: $12.99 USD = 25.98 MERE for all miners
+    const upgradeCost = 25.98;
 
     // Check if user has enough balance
     const [user] = await db.select().from(users).where(eq(users.id, userId));
