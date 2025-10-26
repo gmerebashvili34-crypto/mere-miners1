@@ -124,7 +124,7 @@ export default function Profile() {
     if (firstName.trim()) {
       const nameParts = firstName.trim().split(' ');
       const firstName_ = nameParts[0] || "";
-      const lastName_ = nameParts.slice(1).join(' ') || nameParts[0] || "";
+      const lastName_ = nameParts.slice(1).join(' ') || "";
       updateNameMutation.mutate({ firstName: firstName_, lastName: lastName_ });
     }
   };

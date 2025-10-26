@@ -5,6 +5,8 @@ export function useAuth() {
   const { data: user, isLoading } = useQuery<User>({
     queryKey: ["/api/auth/user"],
     retry: false,
+    refetchInterval: 10000, // Refetch every 10 seconds to keep totalMined and balance updated
+    refetchOnWindowFocus: true,
   });
 
   return {
