@@ -177,6 +177,11 @@ export default function SeasonPass() {
                 {hasPremium ? "Claim your exclusive rewards" : "Unlock premium to access all rewards"}
               </span>
             </div>
+            {premiumRewards.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <p>No premium rewards available. Please refresh the page.</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {premiumRewards.map((reward) => {
                 const claimed = isClaimed(reward.id);
@@ -192,8 +197,9 @@ export default function SeasonPass() {
                         ? "border-primary bg-gold-gradient/10"
                         : "border-border opacity-50"
                     }`}
+                    data-testid={`reward-tier-${reward.tier}`}
                   >
-                    <div className="text-xs font-semibold text-muted-foreground mb-2">
+                    <div className="text-xs font-semibold text-muted-foreground mb-2" data-testid={`text-tier-${reward.tier}`}>
                       Tier {reward.tier}
                     </div>
                     <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-accent flex items-center justify-center">
@@ -205,7 +211,7 @@ export default function SeasonPass() {
                         <Lock className="w-5 h-5 text-muted-foreground" />
                       )}
                     </div>
-                    <div className="text-sm font-semibold mb-2">
+                    <div className="text-sm font-semibold mb-2" data-testid={`text-reward-${reward.tier}`}>
                       {getRewardLabel(reward)}
                     </div>
                     {unlocked && !claimed && (

@@ -521,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = requireUserId(req, res);
       if (!userId) return;
-      const upgradeCost = 200; // 200 MERE
+      const upgradeCost = 999; // 999 MERE
 
       // Check balance
       const user = await storage.getUser(userId);
