@@ -9,22 +9,102 @@ import { eq, sum, count, sql, isNotNull } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
 import { requireAdmin } from "./adminMiddleware";
+import { signUp, signIn } from "./emailAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   await setupAuth(app);
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
+  // Email/Password authentication routes
+  app.post('/api/auth/signup', async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
+      const { email, password, firstName, lastName, referralCode } = req.body;
+      
+      const user = await signUp(email, password, firstName, lastName, referralCode);
+      
+      // Set session
+      (req.session as any).userId = user.id;
+      
+      res.json({ success: true, user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mereBalance: user.mereBalance,
+        totalMined: user.totalMined,
+        referralCode: user.referralCode,
+        isAdmin: user.isAdmin,
+      }});
+    } catch (error: any) {
+      console.error("Sign up error:", error);
+      res.status(400).json({ message: error.message || "Failed to sign up" });
+    }
+  });
+
+  app.post('/api/auth/signin', async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      
+      const user = await signIn(email, password);
+      
+      // Set session
+      (req.session as any).userId = user.id;
+      
+      res.json({ success: true, user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mereBalance: user.mereBalance,
+        totalMined: user.totalMined,
+        referralCode: user.referralCode,
+        isAdmin: user.isAdmin,
+      }});
+    } catch (error: any) {
+      console.error("Sign in error:", error);
+      res.status(400).json({ message: error.message || "Failed to sign in" });
+    }
+  });
+
+  app.post('/api/auth/logout', (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ message: "Failed to log out" });
+      }
+      res.json({ success: true });
+    });
+  });
+
+  // Auth routes (supports both Replit Auth and email/password)
+  app.get('/api/auth/user', async (req: any, res) => {
+    try {
+      // Check email/password session first
+      const sessionUserId = (req.session as any)?.userId;
+      if (sessionUserId) {
+        const user = await storage.getUser(sessionUserId);
+        return res.json(user);
+      }
+      
+      // Fall back to Replit Auth
+      if (req.user?.claims?.sub) {
+        const userId = getUserId(req);
+        const user = await storage.getUser(userId);
+        return res.json(user);
+      }
+      
+      res.status(401).json({ message: "Unauthorized" });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
     }
   });
+
+  // Helper function to get user ID from either auth method
+  function getUserId(req: any): string | null {
+    const sessionUserId = req.session?.userId;
+    if (sessionUserId) return sessionUserId;
+    return req.user?.claims?.sub || null;
+  }
 
   // Shop routes
   app.get('/api/shop/miners', isAuthenticated, async (_req, res) => {
@@ -39,7 +119,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/shop/buy', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+      
       const { minerTypeId, quantity } = req.body;
 
       if (!minerTypeId || !quantity || quantity < 1) {
@@ -102,7 +186,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mining room routes
   app.get('/api/mining/room', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const miners = await storage.getUserMiners(userId);
       res.json(miners);
     } catch (error) {
@@ -113,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/mining/slots', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const slotCount = await storage.getUserSlotCount(userId);
       res.json({ totalSlots: 20, unlockedSlots: slotCount });
     } catch (error) {
@@ -124,7 +208,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/mining/place', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const { minerId, slotPosition } = req.body;
 
       if (!minerId || slotPosition === undefined) {
@@ -152,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/mining/remove', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const { minerId } = req.body;
 
       if (!minerId) {
@@ -177,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/mining/unlock-slot', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
 
       // Check user balance
       const user = await storage.getUser(userId);
@@ -211,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Wallet routes
   app.get('/api/wallet/transactions', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const transactions = await storage.getUserTransactions(userId);
       res.json(transactions);
     } catch (error) {
@@ -234,7 +318,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/wallet/withdraw', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const { amountMere } = req.body;
 
       const amount = parseFloat(amountMere);
@@ -309,7 +393,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Season Pass routes
   app.get('/api/season-pass', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const season = await storage.getCurrentSeason();
       
       if (!season) {
@@ -336,7 +420,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/season-pass/upgrade', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const upgradeCost = 200; // 200 MERE
 
       // Check balance
@@ -378,7 +462,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/season-pass/claim', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const { rewardId } = req.body;
 
       if (!rewardId) {
@@ -405,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Achievements routes
   app.get('/api/achievements', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       
       // Get all achievements with user progress
       const allAchievements = await db.select().from(achievements).where(eq(achievements.isActive, true));
@@ -431,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Referral routes
   app.get('/api/referrals', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = getUserId(req);
       const stats = await getReferralStats(userId);
       res.json(stats);
     } catch (error) {

@@ -6,6 +6,8 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/useAuth";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
+import SignUp from "@/pages/SignUp";
+import SignIn from "@/pages/SignIn";
 import MiningRoom from "@/pages/MiningRoom";
 import Shop from "@/pages/Shop";
 import Wallet from "@/pages/Wallet";
@@ -31,7 +33,11 @@ function Router() {
   return (
     <Switch>
       {!isAuthenticated ? (
-        <Route path="/" component={Landing} />
+        <>
+          <Route path="/" component={Landing} />
+          <Route path="/signup" component={SignUp} />
+          <Route path="/signin" component={SignIn} />
+        </>
       ) : (
         <>
           <Route path="/" component={MiningRoom} />

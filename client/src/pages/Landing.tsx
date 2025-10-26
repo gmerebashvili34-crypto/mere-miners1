@@ -26,17 +26,34 @@ export default function Landing() {
               Buy toy-like miners with MERE tokens, place them in your mining room, and watch your earnings grow in real-time
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
-              <Button
-                size="lg"
-                className="w-full sm:w-auto text-lg px-8 py-6 bg-gold-gradient hover:opacity-90 text-black font-bold"
-                onClick={() => window.location.href = "/api/login"}
-                data-testid="button-login"
-              >
-                Start Mining
-              </Button>
+            <div className="flex flex-col gap-4 justify-center items-center mb-12">
+              <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto text-lg px-8 py-6 bg-gold-gradient hover:opacity-90 text-black font-bold"
+                  onClick={() => window.location.href = "/signup"}
+                  data-testid="button-signup"
+                >
+                  Sign Up
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full sm:w-auto text-lg px-8 py-6"
+                  onClick={() => window.location.href = "/signin"}
+                  data-testid="button-signin"
+                >
+                  Sign In
+                </Button>
+              </div>
               <div className="text-sm text-muted-foreground">
                 1 MERE = $0.50 USD
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Or{" "}
+                <a href="/api/login" className="text-primary hover:underline">
+                  continue with Replit Auth
+                </a>
               </div>
             </div>
 
