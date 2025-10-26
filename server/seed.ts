@@ -1,6 +1,6 @@
 // Seed data for MereMiners
 import { db } from "./db";
-import { minerTypes, seasons, seasonPassRewards } from "@shared/schema";
+import { minerTypes, seasons, seasonPassRewards, achievements } from "@shared/schema";
 
 async function seed() {
   console.log("Seeding database...");
@@ -126,6 +126,103 @@ async function seed() {
 
   await db.insert(seasonPassRewards).values(rewards);
   console.log("✓ Season pass rewards created");
+
+  // Create achievements
+  const achievementsData = [
+    {
+      name: "First Steps",
+      description: "Make your first miner purchase",
+      icon: "ShoppingCart",
+      category: "shop",
+      criteria: { type: "total_purchases", value: 1 },
+      rewardMere: "10.00",
+      tier: "bronze",
+    },
+    {
+      name: "Collector",
+      description: "Own 10 miners",
+      icon: "Package",
+      category: "shop",
+      criteria: { type: "total_miners_owned", value: 10 },
+      rewardMere: "50.00",
+      tier: "silver",
+    },
+    {
+      name: "Mining Beginner",
+      description: "Place your first miner in a slot",
+      icon: "Zap",
+      category: "mining",
+      criteria: { type: "miners_placed", value: 1 },
+      rewardMere: "5.00",
+      tier: "bronze",
+    },
+    {
+      name: "Full Capacity",
+      description: "Fill all 6 default slots",
+      icon: "Grid3x3",
+      category: "mining",
+      criteria: { type: "slots_filled", value: 6 },
+      rewardMere: "25.00",
+      tier: "silver",
+    },
+    {
+      name: "Hash Power",
+      description: "Reach 10 TH/s total hashrate",
+      icon: "TrendingUp",
+      category: "mining",
+      criteria: { type: "total_hashrate", value: 10 },
+      rewardMere: "30.00",
+      tier: "silver",
+    },
+    {
+      name: "Mining Tycoon",
+      description: "Reach 50 TH/s total hashrate",
+      icon: "Crown",
+      category: "mining",
+      criteria: { type: "total_hashrate", value: 50 },
+      rewardMere: "100.00",
+      tier: "gold",
+    },
+    {
+      name: "First Earnings",
+      description: "Earn your first MERE from mining",
+      icon: "Coins",
+      category: "mining",
+      criteria: { type: "total_mined", value: 0.01 },
+      rewardMere: "5.00",
+      tier: "bronze",
+    },
+    {
+      name: "MERE Millionaire",
+      description: "Mine 1000 MERE total",
+      icon: "BadgeDollarSign",
+      category: "mining",
+      criteria: { type: "total_mined", value: 1000 },
+      rewardMere: "250.00",
+      tier: "platinum",
+    },
+    {
+      name: "Premium Pass",
+      description: "Unlock the Season Pass premium tier",
+      icon: "Star",
+      category: "special",
+      criteria: { type: "season_pass_premium", value: 1 },
+      rewardMere: "20.00",
+      tier: "gold",
+    },
+    {
+      name: "Social Butterfly",
+      description: "Refer 5 friends who make a purchase",
+      icon: "Users",
+      category: "social",
+      criteria: { type: "successful_referrals", value: 5 },
+      rewardMere: "75.00",
+      tier: "gold",
+    },
+  ];
+
+  await db.insert(achievements).values(achievementsData);
+  console.log("✓ Achievements created");
 
   console.log("Database seeded successfully!");
 }

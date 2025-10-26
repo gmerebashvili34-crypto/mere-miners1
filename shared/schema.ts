@@ -220,3 +220,53 @@ export const userSeasonPassRelations = relations(userSeasonPass, ({ one }) => ({
 }));
 
 export type UserSeasonPass = typeof userSeasonPass.$inferSelect;
+
+// Achievements
+export const achievements = pgTable("achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: varchar("description").notNull(),
+  icon: varchar("icon").notNull(), // Icon name from lucide-react
+  category: varchar("category").notNull(), // mining, shop, social, special
+  criteria: jsonb("criteria").notNull(), // { type: "first_purchase", value: 1 }
+  rewardMere: numeric("reward_mere", { precision: 10, scale: 2 }),
+  tier: varchar("tier").notNull().default("bronze"), // bronze, silver, gold, platinum
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const achievementsRelations = relations(achievements, ({ many }) => ({
+  userAchievements: many(userAchievements),
+}));
+
+export type Achievement = typeof achievements.$inferSelect;
+
+// User achievements (unlocked achievements)
+export const userAchievements = pgTable("user_achievements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  achievementId: varchar("achievement_id").notNull().references(() => achievements.id, { onDelete: "cascade" }),
+  progress: real("progress").notNull().default(0), // Current progress towards achievement (can be decimal for total_mined, hashrate, etc.)
+  isUnlocked: boolean("is_unlocked").notNull().default(false),
+  unlockedAt: timestamp("unlocked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
+  user: one(users, {
+    fields: [userAchievements.userId],
+    references: [users.id],
+  }),
+  achievement: one(achievements, {
+    fields: [userAchievements.achievementId],
+    references: [achievements.id],
+  }),
+}));
+
+export const insertUserAchievementSchema = createInsertSchema(userAchievements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUserAchievement = z.infer<typeof insertUserAchievementSchema>;
+export type UserAchievement = typeof userAchievements.$inferSelect;

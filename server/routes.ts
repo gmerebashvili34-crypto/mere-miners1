@@ -3,6 +3,10 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { calculateDiscountedPrice, TH_DAILY_YIELD_MERE, SLOT_EXPANSION_PRICE_MERE } from "@shared/constants";
+import { db } from "./db";
+import { achievements, userAchievements } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { achievementsService } from "./achievementsService";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -83,6 +87,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         metadata: { minerTypeId, quantity },
       });
 
+      // Check and unlock achievements
+      await achievementsService.checkAndUnlockAchievements({ userId, type: "purchase" });
+
       res.json({ success: true, cost: finalCost });
     } catch (error) {
       console.error("Error purchasing miner:", error);
@@ -130,6 +137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update slot position
       await storage.updateMinerSlot(minerId, slotPosition);
+
+      // Check and unlock achievements
+      await achievementsService.checkAndUnlockAchievements({ userId, type: "miner_placed" });
 
       res.json({ success: true });
     } catch (error) {
@@ -354,6 +364,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "completed",
       });
 
+      // Check and unlock achievements
+      await achievementsService.checkAndUnlockAchievements({ userId, type: "season_pass_premium" });
+
       res.json({ success: true });
     } catch (error) {
       console.error("Error upgrading season pass:", error);
@@ -384,6 +397,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error claiming reward:", error);
       res.status(500).json({ message: "Failed to claim reward" });
+    }
+  });
+
+  // Achievements routes
+  app.get('/api/achievements', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Get all achievements with user progress
+      const allAchievements = await db.select().from(achievements).where(eq(achievements.isActive, true));
+      const userAchievementRecords = await db.select().from(userAchievements).where(eq(userAchievements.userId, userId));
+      
+      const achievementsWithProgress = allAchievements.map(ach => {
+        const userAch = userAchievementRecords.find(ua => ua.achievementId === ach.id);
+        return {
+          ...ach,
+          progress: userAch?.progress || 0,
+          isUnlocked: userAch?.isUnlocked || false,
+          unlockedAt: userAch?.unlockedAt || null,
+        };
+      });
+
+      res.json(achievementsWithProgress);
+    } catch (error) {
+      console.error("Error fetching achievements:", error);
+      res.status(500).json({ message: "Failed to fetch achievements" });
     }
   });
 

@@ -2,17 +2,54 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { BottomNav } from "@/components/BottomNav";
-import { User as UserIcon, Trophy, Zap, TrendingUp, LogOut, Copy, Check } from "lucide-react";
+import { User as UserIcon, Trophy, Zap, TrendingUp, LogOut, Copy, Check, Lock, ShoppingCart, Package, Grid3x3, Crown, Coins, BadgeDollarSign, Star, Users } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { formatMERE, formatUSD, mereToUSD } from "@/lib/constants";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { useQuery } from "@tanstack/react-query";
+
+interface AchievementWithProgress {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  category: string;
+  tier: string;
+  rewardMere: string;
+  progress: number;
+  isUnlocked: boolean;
+  unlockedAt: Date | null;
+  criteria: {
+    type: string;
+    value: number;
+  };
+}
+
+const iconMap: Record<string, any> = {
+  ShoppingCart,
+  Package,
+  Zap,
+  Grid3x3,
+  TrendingUp,
+  Crown,
+  Coins,
+  BadgeDollarSign,
+  Star,
+  Users,
+  Trophy,
+};
 
 export default function Profile() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [copiedReferral, setCopiedReferral] = useState(false);
+
+  const { data: achievements } = useQuery<AchievementWithProgress[]>({
+    queryKey: ["/api/achievements"],
+  });
 
   const handleCopyReferral = () => {
     if (user?.referralCode) {
@@ -144,47 +181,72 @@ export default function Profile() {
             <Trophy className="w-5 h-5 text-primary" />
             Achievements
           </h3>
-          <div className="grid sm:grid-cols-2 gap-3">
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <Check className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">First Miner</div>
-                <div className="text-xs text-muted-foreground">Purchase your first miner</div>
-              </div>
-            </div>
+          {achievements && achievements.length > 0 ? (
+            <div className="grid sm:grid-cols-2 gap-3">
+              {achievements.map((achievement) => {
+                const Icon = iconMap[achievement.icon] || Trophy;
+                const progressPercent = achievement.criteria 
+                  ? Math.min(100, (achievement.progress / achievement.criteria.value) * 100)
+                  : 0;
 
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-accent/50">
-              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                <Check className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">Getting Started</div>
-                <div className="text-xs text-muted-foreground">Complete your first day of mining</div>
-              </div>
+                return (
+                  <div
+                    key={achievement.id}
+                    className={`p-3 rounded-lg border ${
+                      achievement.isUnlocked
+                        ? "bg-primary/5 border-primary/30"
+                        : "bg-muted/30 border-border opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        achievement.isUnlocked
+                          ? "bg-primary/20"
+                          : "bg-muted"
+                      }`}>
+                        {achievement.isUnlocked ? (
+                          <Icon className="w-5 h-5 text-primary" />
+                        ) : (
+                          <Lock className="w-5 h-5 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="font-semibold text-sm truncate">{achievement.name}</div>
+                          {achievement.isUnlocked && (
+                            <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                              {achievement.tier}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground mb-2">
+                          {achievement.description}
+                        </div>
+                        {!achievement.isUnlocked && achievement.criteria && (
+                          <div className="space-y-1">
+                            <Progress value={progressPercent} className="h-1.5" />
+                            <div className="text-xs text-muted-foreground">
+                              {achievement.progress} / {achievement.criteria.value}
+                            </div>
+                          </div>
+                        )}
+                        {achievement.isUnlocked && achievement.rewardMere && parseFloat(achievement.rewardMere) > 0 && (
+                          <div className="text-xs text-primary font-semibold">
+                            +{formatMERE(parseFloat(achievement.rewardMere))} reward claimed
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 opacity-50">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">100 MERE Mined</div>
-                <div className="text-xs text-muted-foreground">Mine 100 MERE tokens</div>
-              </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>No achievements available yet</p>
             </div>
-
-            <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 opacity-50">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <div className="font-semibold text-sm">Top 10 Miner</div>
-                <div className="text-xs text-muted-foreground">Reach top 10 on the leaderboard</div>
-              </div>
-            </div>
-          </div>
+          )}
         </Card>
 
         {/* Account Actions */}
