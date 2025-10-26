@@ -106,6 +106,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return req.user?.claims?.sub || null;
   }
 
+  // Profile routes
+  app.patch('/api/profile/update-name', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      const { firstName, lastName } = req.body;
+
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: "First name and last name are required" });
+      }
+
+      await db
+        .update(users)
+        .set({
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
+
+      res.json({ success: true, message: "Name updated successfully" });
+    } catch (error) {
+      console.error("Error updating name:", error);
+      res.status(500).json({ message: "Failed to update name" });
+    }
+  });
+
   // Shop routes
   app.get('/api/shop/miners', isAuthenticated, async (_req, res) => {
     try {

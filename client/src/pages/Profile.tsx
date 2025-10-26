@@ -4,12 +4,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { BottomNav } from "@/components/BottomNav";
-import { User as UserIcon, Trophy, Zap, TrendingUp, LogOut, Copy, Check, Lock, ShoppingCart, Package, Grid3x3, Crown, Coins, BadgeDollarSign, Star, Users } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { User as UserIcon, Trophy, Zap, TrendingUp, LogOut, Copy, Check, Lock, ShoppingCart, Package, Grid3x3, Crown, Coins, BadgeDollarSign, Star, Users, Edit2, X as XIcon } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { formatMERE, formatUSD, mereToUSD } from "@/lib/constants";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface AchievementWithProgress {
   id: string;
@@ -46,6 +48,9 @@ export default function Profile() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [copiedReferral, setCopiedReferral] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
   const { data: achievements } = useQuery<AchievementWithProgress[]>({
     queryKey: ["/api/achievements"],
@@ -86,6 +91,49 @@ export default function Profile() {
     window.location.href = "/api/logout";
   };
 
+  const updateNameMutation = useMutation({
+    mutationFn: async (data: { firstName: string; lastName: string }) => {
+      return await apiRequest("/api/profile/update-name", {
+        method: "PATCH",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setIsEditingName(false);
+      toast({
+        title: "Success!",
+        description: "Name updated successfully",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to update name",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditName = () => {
+    setFirstName(user?.firstName || "");
+    setLastName(user?.lastName || "");
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = () => {
+    if (firstName.trim() && lastName.trim()) {
+      updateNameMutation.mutate({ firstName: firstName.trim(), lastName: lastName.trim() });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingName(false);
+    setFirstName("");
+    setLastName("");
+  };
+
   const mereBalance = parseFloat(user?.mereBalance || "0");
   const totalMined = parseFloat(user?.totalMined || "0");
 
@@ -113,20 +161,69 @@ export default function Profile() {
             </Avatar>
             
             <div className="flex-1">
-              <div className="flex items-center justify-between gap-2 mb-1">
-                <h2 className="font-display font-bold text-xl" data-testid="text-user-name">
-                  {user?.firstName && user?.lastName
-                    ? `${user.firstName} ${user.lastName}`
-                    : user?.firstName || user?.email?.split("@")[0] || "Miner"}
-                </h2>
-                <span className="text-xs text-muted-foreground whitespace-nowrap">(Name from Replit)</span>
-              </div>
-              {user?.email && (
-                <p className="text-sm text-muted-foreground mb-3" data-testid="text-user-email">
-                  {user.email}
-                </p>
+              {!isEditingName ? (
+                <>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <h2 className="font-display font-bold text-xl" data-testid="text-user-name">
+                      {user?.firstName && user?.lastName
+                        ? `${user.firstName} ${user.lastName}`
+                        : user?.firstName || user?.email?.split("@")[0] || "Miner"}
+                    </h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleEditName}
+                      className="text-primary hover:text-primary"
+                      data-testid="button-change-name"
+                    >
+                      <Edit2 className="w-4 h-4 mr-1" />
+                      Change Name
+                    </Button>
+                  </div>
+                  {user?.email && (
+                    <p className="text-sm text-muted-foreground mb-3" data-testid="text-user-email">
+                      {user.email}
+                    </p>
+                  )}
+                  <Badge className="bg-primary text-primary-foreground">Active Miner</Badge>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      placeholder="First Name"
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      data-testid="input-first-name"
+                    />
+                    <Input
+                      placeholder="Last Name"
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      data-testid="input-last-name"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleSaveName}
+                      disabled={!firstName.trim() || !lastName.trim() || updateNameMutation.isPending}
+                      className="bg-gold-gradient text-black font-bold"
+                      data-testid="button-save-name"
+                    >
+                      {updateNameMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      disabled={updateNameMutation.isPending}
+                      data-testid="button-cancel-edit"
+                    >
+                      <XIcon className="w-4 h-4 mr-1" />
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
               )}
-              <Badge className="bg-primary text-primary-foreground">Active Miner</Badge>
             </div>
 
             <Button
