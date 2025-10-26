@@ -71,7 +71,7 @@ export function MinerCard({ miner, onPurchase, isPurchasing, showPurchaseButton 
             <div>
               <div className="text-xs text-muted-foreground">Daily Yield</div>
               <div className="font-semibold text-primary">
-                {formatMERE(miner.dailyYieldMere)} MERE
+                {formatMERE(miner.dailyYieldMere)}
               </div>
             </div>
           </div>
@@ -92,7 +92,7 @@ export function MinerCard({ miner, onPurchase, isPurchasing, showPurchaseButton 
           <div className="flex items-baseline justify-between mb-3">
             <div>
               <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
-                {formatMERE(miner.basePriceMere)} MERE
+                {formatMERE(miner.basePriceMere)}
               </div>
               <div className="text-xs text-muted-foreground">
                 ≈ {formatUSD(mereToUSD(parseFloat(miner.basePriceMere)))}
