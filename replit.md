@@ -22,10 +22,11 @@ The game features a luxury black & gold theme with a primary gold color `#D4AF37
 - **Core Features:**
     - **Authentication:** Replit Auth OIDC, auto-profile creation with referral codes.
     - **Mining Room:** Visual slot grid (6-20 slots), drag-and-place miners, real-time stats (Hashrate, Daily Earnings), miner upgrades (unlimited levels, flat 25.98 MERE/$12.99 USD per level, cosmetic only).
-    - **Shop System:** 10 unique miner types, each purchasable only once per type (one-time purchase limit), fixed pricing with no bulk discounts.
+    - **Shop System:** 10 unique miner types, each purchasable only once per type (one-time purchase limit), rarity-based discounts (Rare: -4%, Epic: -5%, Legendary: -7%).
     - **Wallet:** MERE token balance, mock USDT deposit, withdrawal system with fees, transaction history.
-    - **Leaderboard:** Seasonal rankings based on MERE mined, top 3 podium, season countdown.
-    - **Season Pass:** Free and Premium tracks with 20 tiers, claimable rewards, progress based on mining.
+    - **Leaderboard (Ranks):** Seasonal rankings based on MERE mined, top 3 podium, season countdown.
+    - **Season Pass:** Free and Premium tracks with 20 tiers, claimable rewards, progress based on mining. Premium Pass costs 999 MERE, rewards 1,290 MERE (30% profit) plus 10 TH/s total hashrate boosts.
+    - **Mini-Games:** Daily Spin game playable once per 24 hours with randomized rewards (5-50 MERE). Features spinning wheel animation, countdown timer, and error handling.
     - **Profile:** User stats, shareable referral codes (10% bonus), achievement system, referral statistics.
     - **Real-Time Earnings Engine:** Background worker for automatic MERE crediting and leaderboard updates.
     - **Achievement System:** 10 achievements with MERE rewards, real-time progress, auto-crediting.
@@ -33,7 +34,7 @@ The game features a luxury black & gold theme with a primary gold color `#D4AF37
     - **Admin Panel:** Access control, system stats, user management (promote/demote admin), miner type management, season management.
 
 ### System Design Choices
-The project is structured into `client/`, `server/`, and `shared/` directories. `shared/` contains Drizzle schema definitions and shared constants, promoting code reusability and consistency. The system prioritizes mobile-first design and PWA capabilities. Database schema includes tables for users, miner types, user miners, transactions, seasons, leaderboard entries, season pass data, achievements, and sessions, all managed through Drizzle ORM.
+The project is structured into `client/`, `server/`, and `shared/` directories. `shared/` contains Drizzle schema definitions and shared constants, promoting code reusability and consistency. The system prioritizes mobile-first design and PWA capabilities. Database schema includes tables for users, miner types, user miners, transactions, seasons, leaderboard entries, season pass data, achievements, daily games, and sessions, all managed through Drizzle ORM.
 
 ## External Dependencies
 - **Replit:** Hosting, OIDC authentication, and database auto-provisioning.
