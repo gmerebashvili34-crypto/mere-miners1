@@ -84,9 +84,51 @@ MereMiners is a premium mobile-first crypto mining game PWA with a luxury black 
 
 ### 7. Profile
 - User stats (total mined, current balance)
-- Referral code sharing (10% bonus)
-- Achievement system
+- Referral code sharing with persistent codes (10% bonus on referee earnings)
+- Achievement system with real-time progress tracking
+- Referral stats (total referrals, earnings from bonuses)
+- List of referred users with mining stats
 - Logout functionality
+
+### 8. Real-Time Earnings Engine
+- Background worker runs every minute
+- Automatically calculates and credits MERE based on active miners
+- Creates mining_reward transactions
+- Updates leaderboard entries automatically
+- Includes concurrency protection to prevent double-crediting
+
+### 9. Achievement System
+- 10 achievements with MERE rewards:
+  - First Steps (1 MERE) - Make your first purchase
+  - Getting Started (5 MERE) - Place your first miner
+  - Power User (10 MERE) - Reach 10 TH/s total hashrate
+  - Mining Tycoon (25 MERE) - Reach 50 TH/s total hashrate
+  - Hash Master (50 MERE) - Reach 100 TH/s total hashrate
+  - Wealthy Miner (20 MERE) - Earn 1,000 MERE total
+  - Millionaire (100 MERE) - Earn 10,000 MERE total
+  - Slot Hoarder (15 MERE) - Unlock 15 mining slots
+  - Max Capacity (30 MERE) - Unlock all 20 slots
+  - Social Butterfly (50 MERE) - Refer 10 friends
+- Automatic unlock detection on relevant actions
+- Real-time progress tracking with decimal support
+- Achievement rewards auto-credited to balance
+- Profile page displays unlocked achievements with progress bars
+
+### 10. Referral Rewards System
+- Unique referral codes generated once per user (e.g., MERE8X4K2P)
+- Referral link format: `/api/login?ref=CODE`
+- Security features:
+  - Prevents self-referrals
+  - Prevents referral swapping (code locked once set)
+  - Referral codes persist across all logins
+- 10% bonus on all referred users' mining earnings
+- Automatic bonus crediting via earnings engine
+- Referral stats tracking:
+  - Total referrals count
+  - Total earnings from referral bonuses
+  - List of referred users with their stats
+  - Recent bonus transaction history
+- Profile page shows complete referral dashboard
 
 ## Economics
 
@@ -164,18 +206,30 @@ MereMiners is a premium mobile-first crypto mining game PWA with a luxury black 
 - `POST /api/season-pass/upgrade` - Upgrade to premium (costs 200 MERE)
 - `POST /api/season-pass/claim` - Claim reward (requires: rewardId)
 
+### Achievements
+- `GET /api/achievements` - Get user's achievement progress and unlocked achievements
+- Returns array of achievements with progress, unlocked status, and claimed status
+
+### Referrals
+- `GET /api/referrals` - Get referral statistics
+- Returns: totalReferrals, totalReferralEarnings, referredUsers[], recentBonuses[]
+
 ## Database Schema
 
 ### Tables
-- **users** - User profiles, balances, referral codes
+- **users** - User profiles, balances, referral codes, referral tracking
+  - New fields: `referredById`, `totalReferrals`, `totalReferralEarnings`
 - **miner_types** - Available miner templates
 - **user_miners** - Owned miners with placement
-- **transactions** - All MERE movements
+- **transactions** - All MERE movements (including mining_reward, referral_bonus, achievement_reward)
 - **seasons** - Season definitions
 - **leaderboard_entries** - Seasonal rankings
 - **season_pass_rewards** - Reward definitions
 - **user_season_pass** - User pass progress
 - **sessions** - Auth session storage
+- **achievements** - Achievement definitions (id, title, description, requirement, reward)
+- **user_achievements** - User achievement progress
+  - Fields: userId, achievementId, progress (real for decimals), unlocked, claimed
 
 ## Development
 
