@@ -582,6 +582,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Reward not found" });
       }
 
+      // Verify reward belongs to current season
+      if (reward.seasonId !== season.id) {
+        return res.status(400).json({ message: "Reward does not belong to current season" });
+      }
+
+      // Get user's season pass progress
+      const userPass = await storage.getUserSeasonPass(userId, season.id);
+      if (!userPass) {
+        return res.status(404).json({ message: "Season pass not found" });
+      }
+
+      // Check if user has reached required tier
+      if (userPass.currentTier < reward.tier) {
+        return res.status(403).json({ message: "You haven't reached this tier yet" });
+      }
+
+      // Check if premium reward requires premium status
+      if (reward.isPremium && !userPass.hasPremium) {
+        return res.status(403).json({ message: "Premium pass required for this reward" });
+      }
+
+      // Check if reward was already claimed
+      const claimedRewards = Array.isArray(userPass.claimedRewards) 
+        ? (userPass.claimedRewards as string[]) 
+        : [];
+      if (claimedRewards.includes(rewardId)) {
+        return res.status(400).json({ message: "Reward already claimed" });
+      }
+
       // Claim reward
       await storage.claimSeasonPassReward(userId, season.id, rewardId);
 

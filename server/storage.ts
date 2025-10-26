@@ -385,7 +385,11 @@ export class DatabaseStorage implements IStorage {
     
     if (!pass) throw new Error("Season pass not found");
     
-    const claimed = (pass.claimedRewards as string[]) || [];
+    // Ensure claimedRewards is always an array (Drizzle converts jsonb to JS array)
+    const claimed = Array.isArray(pass.claimedRewards) 
+      ? (pass.claimedRewards as string[]) 
+      : [];
+    
     if (!claimed.includes(rewardId)) {
       claimed.push(rewardId);
       await db
