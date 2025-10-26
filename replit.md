@@ -27,9 +27,9 @@ The game features a luxury black & gold theme with a primary gold color `#D4AF37
     - **Leaderboard (Ranks):** Seasonal rankings based on MERE mined, top 3 podium, season countdown.
     - **Season Pass:** Free and Premium tracks with 20 tiers, claimable rewards, progress based on mining. Premium Pass costs 999 MERE, rewards 1,290 MERE (30% profit) plus 10 TH/s total hashrate boosts.
     - **Mini-Games:** Three daily mini-games playable once per 24 hours:
-        - **Daily Spin:** Spinning wheel with randomized rewards (5-50 MERE), animated wheel, countdown timer.
-        - **Lucky Draw:** Rarity-based gem rewards (0.01-0.5 MERE), first play guaranteed 0.01 MERE, weighted probabilities (50% Common, 30% Rare, 15% Epic, 5% Legendary), rarity-specific colors.
-        - **Miner Match:** Memory card matching game with 6 pairs, performance-based rewards (0.5 MERE for perfect game, decreasing by 0.01 per extra move, min 0.01 MERE), move tracking.
+        - **Daily Spin:** Spinning wheel with randomized rewards (0.01-0.05 MERE), animated wheel, countdown timer.
+        - **Lucky Draw:** Rarity-based gem rewards (0.01-0.07 MERE), first play guaranteed 0.01 MERE, weighted probabilities (50% Common: 0.01-0.02, 30% Rare: 0.02-0.04, 15% Epic: 0.04-0.06, 5% Legendary: 0.06-0.07), rarity-specific colors.
+        - **Miner Match:** Memory card matching game with 6 pairs, performance-based rewards (0.08 MERE for perfect game, decreasing by 0.01 per extra move, min 0.01 MERE), move tracking.
     - **Profile:** User stats, shareable referral codes (10% bonus), achievement system, referral statistics.
     - **Real-Time Earnings Engine:** Background worker for automatic MERE crediting and leaderboard updates.
     - **Achievement System:** 10 achievements with MERE rewards, real-time progress, auto-crediting.
