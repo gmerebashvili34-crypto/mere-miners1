@@ -41,8 +41,11 @@ export default function MiningRoom() {
   const placedMiners = userMiners.filter(m => m.slotPosition !== null);
   const unplacedMiners = userMiners.filter(m => m.slotPosition === null);
 
-  // Calculate total stats
-  const totalHashrate = placedMiners.reduce((sum, m) => sum + m.minerType.thRate * m.boostMultiplier, 0);
+  // Calculate total stats (including upgrade multipliers)
+  const totalHashrate = placedMiners.reduce((sum, m) => {
+    const upgradeMultiplier = 1.0 + (m.upgradeLevel * 0.2);
+    return sum + m.minerType.thRate * m.boostMultiplier * upgradeMultiplier;
+  }, 0);
   const totalDailyEarnings = totalHashrate * TH_DAILY_YIELD_MERE;
 
   // Place miner mutation
@@ -78,6 +81,28 @@ export default function MiningRoom() {
       toast({
         title: "Miner Removed",
         description: "Miner removed from mining room",
+      });
+    },
+  });
+
+  // Upgrade miner mutation
+  const upgradeMinerMutation = useMutation({
+    mutationFn: async (minerId: string) => {
+      return await apiRequest("POST", "/api/mining/upgrade", { minerId });
+    },
+    onSuccess: (data: { newLevel: number; cost: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mining/room"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({
+        title: "Miner Upgraded!",
+        description: `Upgraded to level ${data.newLevel} for ${data.cost} MERE`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Upgrade Failed",
+        description: error.message,
+        variant: "destructive",
       });
     },
   });
@@ -207,6 +232,7 @@ export default function MiningRoom() {
                 isEmpty={!miner}
                 onAddMiner={() => handleAddMinerToSlot(slotNumber)}
                 onRemoveMiner={(minerId) => removeMinerMutation.mutate(minerId)}
+                onUpgradeMiner={(minerId) => upgradeMinerMutation.mutate(minerId)}
               />
             );
           })}

@@ -42,6 +42,19 @@ async function seed() {
       isAvailable: true,
     },
     {
+      name: "Crystal Miner",
+      description: "Crystalline structure with prismatic light refraction",
+      imageUrl: "/attached_assets/generated_images/Crystal_prismatic_crypto_miner_e13159c4.png",
+      thRate: 3.5,
+      basePriceUsd: "48.98",
+      basePriceMere: "97.96",
+      dailyYieldUsd: "0.28",
+      dailyYieldMere: "0.56",
+      roiDays: 175,
+      rarity: "common",
+      isAvailable: true,
+    },
+    {
       name: "Sphere Miner",
       description: "Advanced spherical design with hexagonal pattern",
       imageUrl: "/attached_assets/generated_images/Gold_sphere_miner_f2c342a6.png",
@@ -50,6 +63,19 @@ async function seed() {
       basePriceMere: "139.90",
       dailyYieldUsd: "0.40",
       dailyYieldMere: "0.80",
+      roiDays: 175,
+      rarity: "rare",
+      isAvailable: true,
+    },
+    {
+      name: "Spiral Reactor",
+      description: "Spiral design with advanced cooling system",
+      imageUrl: "/attached_assets/generated_images/Spiral_helix_crypto_miner_f526e8a9.png",
+      thRate: 7.5,
+      basePriceUsd: "104.93",
+      basePriceMere: "209.86",
+      dailyYieldUsd: "0.60",
+      dailyYieldMere: "1.20",
       roiDays: 175,
       rarity: "rare",
       isAvailable: true,
@@ -68,6 +94,32 @@ async function seed() {
       isAvailable: true,
     },
     {
+      name: "Fusion Core",
+      description: "Compact fusion reactor with quantum processing",
+      imageUrl: "/attached_assets/generated_images/Fusion_reactor_crypto_miner_f287348b.png",
+      thRate: 15.0,
+      basePriceUsd: "209.85",
+      basePriceMere: "419.70",
+      dailyYieldUsd: "1.20",
+      dailyYieldMere: "2.40",
+      roiDays: 175,
+      rarity: "epic",
+      isAvailable: true,
+    },
+    {
+      name: "Titan Core",
+      description: "Industrial-grade processing with triple redundancy",
+      imageUrl: "/attached_assets/generated_images/Industrial_titan_crypto_miner_6e14b456.png",
+      thRate: 20.0,
+      basePriceUsd: "279.80",
+      basePriceMere: "559.60",
+      dailyYieldUsd: "1.60",
+      dailyYieldMere: "3.20",
+      roiDays: 175,
+      rarity: "epic",
+      isAvailable: true,
+    },
+    {
       name: "Pyramid Elite",
       description: "Elite-tier supercomputer with holographic circuitry",
       imageUrl: "/attached_assets/generated_images/Gold_pyramid_elite_miner_e9c12d5d.png",
@@ -76,6 +128,19 @@ async function seed() {
       basePriceMere: "699.50",
       dailyYieldUsd: "2.00",
       dailyYieldMere: "4.00",
+      roiDays: 175,
+      rarity: "legendary",
+      isAvailable: true,
+    },
+    {
+      name: "Mega Fortress",
+      description: "Ultimate powerhouse with AI-driven optimization",
+      imageUrl: "/attached_assets/generated_images/Mega_fortress_crypto_miner_65940d16.png",
+      thRate: 50.0,
+      basePriceUsd: "699.50",
+      basePriceMere: "1399.00",
+      dailyYieldUsd: "4.00",
+      dailyYieldMere: "8.00",
       roiDays: 175,
       rarity: "legendary",
       isAvailable: true,
@@ -98,28 +163,24 @@ async function seed() {
   }).returning();
   console.log("✓ Season created");
 
-  // Create season pass rewards
+  // Create premium-only season pass rewards (balanced)
   const rewards = [];
   for (let tier = 0; tier < 20; tier++) {
-    // Free rewards
-    rewards.push({
-      seasonId: season.id,
-      tier,
-      isPremium: false,
-      rewardType: "mere",
-      rewardValue: ((tier + 1) * 10).toString(),
-      rewardMetadata: { name: `${(tier + 1) * 10} MERE` },
-    });
-
-    // Premium rewards
+    const rewardAmount = tier < 5 ? (tier + 1) * 50 : // Tiers 0-4: 50-250 MERE
+                        tier < 10 ? (tier + 1) * 75 : // Tiers 5-9: 450-750 MERE
+                        tier < 15 ? (tier + 1) * 100 : // Tiers 10-14: 1100-1500 MERE
+                        (tier + 1) * 150; // Tiers 15-19: 2400-3000 MERE
+    
+    // Premium rewards - mix of MERE and special rewards
     rewards.push({
       seasonId: season.id,
       tier,
       isPremium: true,
-      rewardType: tier % 5 === 4 ? "miner" : "mere",
-      rewardValue: ((tier + 1) * 25).toString(),
+      rewardType: tier % 5 === 4 ? "booster" : "mere",
+      rewardValue: tier % 5 === 4 ? "0.25" : rewardAmount.toString(), // 25% boost every 5 tiers
       rewardMetadata: {
-        name: tier % 5 === 4 ? "Premium Miner" : `${(tier + 1) * 25} MERE`,
+        name: tier % 5 === 4 ? "Hashrate Boost +25%" : `${rewardAmount} MERE`,
+        description: tier % 5 === 4 ? "Permanent +25% boost to all miners" : "Instant MERE reward",
       },
     });
   }

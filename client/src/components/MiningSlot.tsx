@@ -1,7 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, Zap, TrendingUp, X } from "lucide-react";
+import { Plus, Zap, TrendingUp, X, ArrowUp } from "lucide-react";
 import type { UserMiner, MinerType } from "@shared/schema";
 import { formatMERE, formatUSD, mereToUSD, TH_DAILY_YIELD_MERE } from "@/lib/constants";
 
@@ -10,6 +10,7 @@ interface MiningSlotProps {
   miner?: UserMiner & { minerType: MinerType };
   onAddMiner?: () => void;
   onRemoveMiner?: (minerId: string) => void;
+  onUpgradeMiner?: (minerId: string) => void;
   isEmpty?: boolean;
   isLocked?: boolean;
   onUnlock?: () => void;
@@ -19,7 +20,8 @@ export function MiningSlot({
   slotNumber, 
   miner, 
   onAddMiner, 
-  onRemoveMiner, 
+  onRemoveMiner,
+  onUpgradeMiner,
   isEmpty = true,
   isLocked = false,
   onUnlock 
@@ -65,8 +67,13 @@ export function MiningSlot({
     );
   }
 
-  const dailyYield = miner.minerType.thRate * TH_DAILY_YIELD_MERE * miner.boostMultiplier;
+  // Calculate upgrade multiplier (each level adds 20%)
+  const upgradeMultiplier = 1.0 + (miner.upgradeLevel * 0.2);
+  const dailyYield = miner.minerType.thRate * TH_DAILY_YIELD_MERE * miner.boostMultiplier * upgradeMultiplier;
   const isActive = miner.isActive;
+  const upgradeLevel = miner.upgradeLevel || 0;
+  const maxLevel = 5;
+  const upgradeCost = upgradeLevel < maxLevel ? 50 * Math.pow(2, upgradeLevel) : 0;
 
   return (
     <Card className="relative aspect-[4/5] overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group">
@@ -82,6 +89,18 @@ export function MiningSlot({
         </Button>
       )}
 
+      {onUpgradeMiner && upgradeLevel < maxLevel && (
+        <Button
+          size="icon"
+          variant="ghost"
+          className="absolute top-2 right-10 z-10 w-6 h-6 rounded-full bg-black/50 hover:bg-primary opacity-0 group-hover:opacity-100 transition-opacity"
+          onClick={() => onUpgradeMiner(miner.id)}
+          data-testid={`button-upgrade-miner-${miner.id}`}
+        >
+          <ArrowUp className="w-3 h-3 text-white" />
+        </Button>
+      )}
+
       {isActive && (
         <div className="absolute top-2 left-2 z-10">
           <Badge className="bg-status-online text-white text-xs animate-pulse-glow">
@@ -90,8 +109,16 @@ export function MiningSlot({
         </div>
       )}
 
-      {miner.boostMultiplier > 1 && (
+      {upgradeLevel > 0 && (
         <div className="absolute top-2 left-2 z-10 mt-7">
+          <Badge className="bg-gold-gradient text-black text-xs font-bold">
+            Level {upgradeLevel}
+          </Badge>
+        </div>
+      )}
+
+      {miner.boostMultiplier > 1 && (
+        <div className="absolute top-2 left-2 z-10" style={{ marginTop: upgradeLevel > 0 ? '3.5rem' : '1.75rem' }}>
           <Badge className="bg-primary text-primary-foreground text-xs">
             {miner.boostMultiplier}x Boost
           </Badge>
@@ -119,7 +146,7 @@ export function MiningSlot({
         )}
       </div>
 
-      <div className="p-3 space-y-2">
+      <div className="p-3 space-y-1.5">
         <h4 className="font-semibold text-sm text-foreground truncate" data-testid={`text-placed-miner-name-${miner.id}`}>
           {miner.minerType.name}
         </h4>
@@ -127,7 +154,9 @@ export function MiningSlot({
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="flex items-center gap-1">
             <Zap className="w-3 h-3 text-primary" />
-            <span className="text-muted-foreground">{miner.minerType.thRate} TH/s</span>
+            <span className="text-muted-foreground">
+              {(miner.minerType.thRate * upgradeMultiplier).toFixed(1)} TH/s
+            </span>
           </div>
           <div className="flex items-center gap-1">
             <TrendingUp className="w-3 h-3 text-primary" />
@@ -138,6 +167,14 @@ export function MiningSlot({
         <div className="text-xs text-muted-foreground">
           ≈ {formatUSD(mereToUSD(dailyYield))}/day
         </div>
+
+        {onUpgradeMiner && upgradeLevel < maxLevel && (
+          <div className="pt-1">
+            <p className="text-xs text-muted-foreground">
+              Upgrade: {upgradeCost} MERE → +20%
+            </p>
+          </div>
+        )}
       </div>
     </Card>
   );

@@ -72,7 +72,6 @@ export default function SeasonPass() {
   const maxTier = 20;
   const progressPercent = (currentTier / maxTier) * 100;
 
-  const freeRewards = userPass?.rewards.filter(r => !r.isPremium) || [];
   const premiumRewards = userPass?.rewards.filter(r => r.isPremium) || [];
 
   const getRewardIcon = (type: string) => {
@@ -126,7 +125,7 @@ export default function SeasonPass() {
             <div>
               <h2 className="font-display font-bold text-xl">{userPass?.seasonName || "Current Season"}</h2>
               <p className="text-sm text-muted-foreground">
-                {hasPremium ? "Premium Pass Active" : "Free Pass"}
+                {hasPremium ? "Premium Pass Active" : "Activate Premium to unlock all rewards"}
               </p>
             </div>
             {!hasPremium && (
@@ -153,73 +152,29 @@ export default function SeasonPass() {
           </div>
         </Card>
 
-        {/* Rewards Track */}
+        {/* Rewards Track - Premium Only */}
         <div className="space-y-4">
-          <h2 className="font-display font-bold text-lg">Rewards</h2>
-
-          {/* Free Lane */}
-          <div>
-            <div className="flex items-center gap-2 mb-3">
-              <Badge variant="secondary">Free</Badge>
-              <span className="text-sm text-muted-foreground">Available to all players</span>
-            </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {freeRewards.map((reward) => {
-                const claimed = isClaimed(reward.id);
-                const unlocked = canClaim(reward.tier);
-                
-                return (
-                  <Card
-                    key={reward.id}
-                    className={`p-4 text-center border-2 ${
-                      claimed
-                        ? "border-status-online bg-status-online/10"
-                        : unlocked
-                        ? "border-primary bg-primary/5"
-                        : "border-border opacity-50"
-                    }`}
-                  >
-                    <div className="text-xs font-semibold text-muted-foreground mb-2">
-                      Tier {reward.tier}
-                    </div>
-                    <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-accent flex items-center justify-center">
-                      {claimed ? (
-                        <Check className="w-6 h-6 text-status-online" />
-                      ) : unlocked ? (
-                        getRewardIcon(reward.rewardType)
-                      ) : (
-                        <Lock className="w-5 h-5 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="text-sm font-semibold mb-2">
-                      {getRewardLabel(reward)}
-                    </div>
-                    {unlocked && !claimed && (
-                      <Button
-                        size="sm"
-                        onClick={() => claimMutation.mutate(reward.id)}
-                        disabled={claimMutation.isPending}
-                        className="w-full"
-                        data-testid={`button-claim-free-${reward.tier}`}
-                      >
-                        Claim
-                      </Button>
-                    )}
-                    {claimed && (
-                      <Badge className="bg-status-online text-white text-xs">Claimed</Badge>
-                    )}
-                  </Card>
-                );
-              })}
-            </div>
+          <div className="flex items-center justify-between">
+            <h2 className="font-display font-bold text-lg flex items-center gap-2">
+              <Crown className="w-5 h-5 text-primary" />
+              Premium Rewards
+            </h2>
+            {!hasPremium && (
+              <Button
+                onClick={() => upgradeMutation.mutate()}
+                disabled={!canAffordUpgrade || upgradeMutation.isPending}
+                className="bg-gold-gradient text-black font-bold"
+                size="sm"
+              >
+                Activate Premium
+              </Button>
+            )}
           </div>
 
-          {/* Premium Lane */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <Badge className="bg-gold-gradient text-black font-bold">Premium</Badge>
               <span className="text-sm text-muted-foreground">
-                {hasPremium ? "You have access" : "Upgrade to unlock"}
+                {hasPremium ? "Claim your exclusive rewards" : "Unlock premium to access all rewards"}
               </span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -279,24 +234,24 @@ export default function SeasonPass() {
           <Card className="p-6 bg-gradient-to-br from-card to-primary/20 border-primary/50">
             <h3 className="font-display font-bold text-lg mb-4 flex items-center gap-2">
               <Crown className="w-5 h-5 text-primary" />
-              Premium Pass Benefits
+              Activate Premium Pass
             </h3>
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />
-                <span>Access to exclusive premium rewards</span>
+                <span>20 tiers of exclusive premium rewards</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />
-                <span>2x rewards at every tier</span>
+                <span>Earn up to 18,500 MERE in rewards</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />
-                <span>Legendary miners and rare skins</span>
+                <span>Unlock +25% hashrate boosts every 5 tiers</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />
-                <span>Extra MERE bonus rewards</span>
+                <span>Progress automatically as you mine MERE</span>
               </li>
             </ul>
             <Button
@@ -306,7 +261,7 @@ export default function SeasonPass() {
               size="lg"
               data-testid="button-upgrade-premium-cta"
             >
-              {canAffordUpgrade ? "Upgrade Now (200 MERE)" : "Insufficient Balance (Need 200 MERE)"}
+              {canAffordUpgrade ? "Activate Premium (200 MERE)" : "Insufficient Balance (Need 200 MERE)"}
             </Button>
           </Card>
         )}

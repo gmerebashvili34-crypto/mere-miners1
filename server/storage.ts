@@ -46,6 +46,7 @@ export interface IStorage {
   getUserMiner(id: string): Promise<(UserMiner & { minerType: MinerType }) | undefined>;
   createUserMiner(userMiner: InsertUserMiner): Promise<UserMiner>;
   updateMinerSlot(minerId: string, slotPosition: number | null): Promise<void>;
+  upgradeMiner(minerId: string, userId: string): Promise<{ newLevel: number; cost: number }>;
   
   // Transaction operations
   getUserTransactions(userId: string): Promise<Transaction[]>;
@@ -192,6 +193,60 @@ export class DatabaseStorage implements IStorage {
       .update(userMiners)
       .set({ slotPosition })
       .where(eq(userMiners.id, minerId));
+  }
+
+  async upgradeMiner(minerId: string, userId: string): Promise<{ newLevel: number; cost: number }> {
+    // Get the miner
+    const [miner] = await db
+      .select()
+      .from(userMiners)
+      .where(and(eq(userMiners.id, minerId), eq(userMiners.userId, userId)));
+
+    if (!miner) {
+      throw new Error("Miner not found");
+    }
+
+    const currentLevel = miner.upgradeLevel;
+    if (currentLevel >= 5) {
+      throw new Error("Miner is already at max level");
+    }
+
+    // Calculate upgrade cost (exponential: 50, 100, 200, 400, 800 MERE)
+    const upgradeCost = 50 * Math.pow(2, currentLevel);
+
+    // Check if user has enough balance
+    const [user] = await db.select().from(users).where(eq(users.id, userId));
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    const balance = parseFloat(user.mereBalance);
+    if (balance < upgradeCost) {
+      throw new Error(`Insufficient balance. Need ${upgradeCost} MERE`);
+    }
+
+    // Deduct cost from user balance
+    await this.updateUserBalance(userId, upgradeCost.toString(), "subtract");
+
+    // Upgrade the miner
+    const newLevel = currentLevel + 1;
+    await db
+      .update(userMiners)
+      .set({ upgradeLevel: newLevel })
+      .where(eq(userMiners.id, minerId));
+
+    // Create transaction record
+    await this.createTransaction({
+      userId,
+      type: "purchase",
+      amountMere: (-upgradeCost).toString(),
+      amountUsd: null,
+      description: `Upgraded miner to level ${newLevel}`,
+      status: "completed",
+      metadata: { minerId, oldLevel: currentLevel, newLevel },
+    });
+
+    return { newLevel, cost: upgradeCost };
   }
 
   // Transaction operations

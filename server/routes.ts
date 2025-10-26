@@ -264,6 +264,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/mining/upgrade', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      const { minerId } = req.body;
+
+      if (!minerId) {
+        return res.status(400).json({ message: "Invalid request" });
+      }
+
+      // Upgrade the miner
+      const result = await storage.upgradeMiner(minerId, userId);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error upgrading miner:", error);
+      res.status(400).json({ message: error.message || "Failed to upgrade miner" });
+    }
+  });
+
   app.post('/api/mining/unlock-slot', isAuthenticated, async (req: any, res) => {
     try {
       const userId = requireUserId(req, res);

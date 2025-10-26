@@ -78,6 +78,7 @@ export const userMiners = pgTable("user_miners", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   minerTypeId: varchar("miner_type_id").notNull().references(() => minerTypes.id),
   slotPosition: integer("slot_position"), // null if not placed in mining room
+  upgradeLevel: integer("upgrade_level").notNull().default(0), // 0-5, each level adds 20% hashrate
   purchasedAt: timestamp("purchased_at").defaultNow(),
   isActive: boolean("is_active").notNull().default(true),
   boostMultiplier: real("boost_multiplier").notNull().default(1.0),
