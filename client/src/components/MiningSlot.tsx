@@ -155,28 +155,26 @@ export function MiningSlot({
           </div>
         </div>
 
-        <div className="p-2 pt-0 mt-auto space-y-1">
+        <div className="p-2 pt-0 mt-auto space-y-1.5">
           {onUpgradeMiner && (
             <Button
-              size="sm"
               onClick={() => onUpgradeMiner(miner.id)}
-              className="w-full h-7 bg-gold-gradient text-black font-bold text-[10px] flex items-center justify-center gap-1"
+              className="w-full bg-gold-gradient text-black font-bold text-xs flex items-center justify-center gap-1.5"
               data-testid={`button-upgrade-miner-${miner.id}`}
             >
-              <ArrowUp className="w-3 h-3" />
+              <ArrowUp className="w-4 h-4" />
               <span>Upgrade ({upgradeCost} MERE)</span>
             </Button>
           )}
           
           {onRemoveMiner && (
             <Button
-              size="sm"
               variant="outline"
               onClick={() => setShowRemoveConfirm(true)}
-              className="w-full h-7 border-destructive/50 text-destructive hover:bg-destructive hover:text-white text-[10px] flex items-center justify-center gap-1"
+              className="w-full border-destructive/50 text-destructive hover:bg-destructive hover:text-white text-xs flex items-center justify-center gap-1.5"
               data-testid={`button-remove-miner-${miner.id}`}
             >
-              <X className="w-3 h-3" />
+              <X className="w-4 h-4" />
               <span>Remove</span>
             </Button>
           )}
