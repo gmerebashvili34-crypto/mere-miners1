@@ -130,6 +130,7 @@ export function MiningSlot({
             src={miner.minerType.imageUrl}
             alt={miner.minerType.name}
             className="max-w-[85%] max-h-[85%] object-contain animate-float"
+            style={{ mixBlendMode: 'multiply' }}
             data-testid={`img-placed-miner-${miner.id}`}
           />
         </div>
