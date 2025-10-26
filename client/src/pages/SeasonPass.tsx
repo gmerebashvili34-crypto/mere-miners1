@@ -243,7 +243,7 @@ export default function SeasonPass() {
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />
-                <span>Earn up to 18,500 MERE in rewards</span>
+                <span>Earn up to 1,290 MERE in rewards (30% profit)</span>
               </li>
               <li className="flex items-center gap-2">
                 <Check className="w-4 h-4 text-primary" />

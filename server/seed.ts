@@ -163,13 +163,12 @@ async function seed() {
   }).returning();
   console.log("✓ Season created");
 
-  // Create premium-only season pass rewards (balanced)
+  // Create premium-only season pass rewards (balanced at 999 MERE cost, 1290 MERE total rewards = 30% profit)
   const rewards = [];
+  const rewardAmounts = [30, 40, 50, 60, 0, 65, 70, 75, 80, 0, 85, 90, 95, 100, 0, 105, 110, 115, 120, 0];
+  
   for (let tier = 0; tier < 20; tier++) {
-    const rewardAmount = tier < 5 ? (tier + 1) * 50 : // Tiers 0-4: 50-250 MERE
-                        tier < 10 ? (tier + 1) * 75 : // Tiers 5-9: 450-750 MERE
-                        tier < 15 ? (tier + 1) * 100 : // Tiers 10-14: 1100-1500 MERE
-                        (tier + 1) * 150; // Tiers 15-19: 2400-3000 MERE
+    const rewardAmount = rewardAmounts[tier];
     
     // Premium rewards - mix of MERE and special rewards
     rewards.push({
