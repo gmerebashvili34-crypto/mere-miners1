@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { BottomNav } from "@/components/BottomNav";
-import { Wallet as WalletIcon, ArrowDownToLine, ArrowUpFromLine, Copy, Check, ExternalLink } from "lucide-react";
+import { Wallet as WalletIcon, ArrowDownToLine, ArrowUpFromLine, Copy, Check, ExternalLink, ArrowLeftRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { formatMERE, formatUSD, mereToUSD, usdToMERE, MERE_TO_USD_RATE } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
@@ -25,7 +25,10 @@ export default function Wallet() {
   const { toast } = useToast();
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
+  const [showConvert, setShowConvert] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState("");
+  const [convertAmount, setConvertAmount] = useState("");
+  const [convertDirection, setConvertDirection] = useState<"mere-to-usdt" | "usdt-to-mere">("mere-to-usdt");
   const [depositAddress, setDepositAddress] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -69,6 +72,30 @@ export default function Wallet() {
     },
   });
 
+  // Convert mutation
+  const convertMutation = useMutation({
+    mutationFn: async (data: { fromCurrency: string, toCurrency: string, amount: string }) => {
+      await apiRequest("POST", "/api/wallet/convert", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/wallet/transactions"] });
+      setShowConvert(false);
+      setConvertAmount("");
+      toast({
+        title: "Conversion Successful",
+        description: "Your funds have been converted",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Conversion Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(depositAddress);
     setCopied(true);
@@ -98,6 +125,22 @@ export default function Wallet() {
     withdrawMutation.mutate(withdrawAmount);
   };
 
+  const handleConvert = () => {
+    if (!convertAmount || parseFloat(convertAmount) <= 0) {
+      toast({
+        title: "Invalid Amount",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
+    convertMutation.mutate({
+      fromCurrency: convertDirection === "mere-to-usdt" ? "MERE" : "USDT",
+      toCurrency: convertDirection === "mere-to-usdt" ? "USDT" : "MERE",
+      amount: convertAmount
+    });
+  };
+
   const getTransactionIcon = (type: string) => {
     switch (type) {
       case "deposit":
@@ -108,6 +151,8 @@ export default function Wallet() {
         return <WalletIcon className="w-4 h-4 text-primary" />;
       case "earnings":
         return <TrendingUp className="w-4 h-4 text-primary" />;
+      case "conversion":
+        return <ArrowLeftRight className="w-4 h-4 text-primary" />;
       default:
         return <WalletIcon className="w-4 h-4 text-muted-foreground" />;
     }
@@ -122,6 +167,8 @@ export default function Wallet() {
       case "withdrawal":
       case "purchase":
         return "text-status-busy";
+      case "conversion":
+        return "text-primary";
       default:
         return "text-foreground";
     }
@@ -159,10 +206,10 @@ export default function Wallet() {
               </div>
             </div>
 
-            <div className="flex gap-3 justify-center">
+            <div className="flex gap-2 justify-center flex-wrap">
               <Button
                 onClick={handleDeposit}
-                className="flex-1 max-w-[200px] bg-gold-gradient text-black font-bold"
+                className="flex-1 min-w-[140px] bg-gold-gradient text-black font-bold"
                 data-testid="button-deposit"
               >
                 <ArrowDownToLine className="w-4 h-4 mr-2" />
@@ -171,11 +218,20 @@ export default function Wallet() {
               <Button
                 onClick={() => setShowWithdraw(true)}
                 variant="outline"
-                className="flex-1 max-w-[200px]"
+                className="flex-1 min-w-[140px]"
                 data-testid="button-withdraw"
               >
                 <ArrowUpFromLine className="w-4 h-4 mr-2" />
                 Withdraw
+              </Button>
+              <Button
+                onClick={() => setShowConvert(true)}
+                variant="secondary"
+                className="flex-1 min-w-[140px]"
+                data-testid="button-convert"
+              >
+                <ArrowLeftRight className="w-4 h-4 mr-2" />
+                Convert
               </Button>
             </div>
           </div>
@@ -383,6 +439,119 @@ export default function Wallet() {
               data-testid="button-confirm-withdraw"
             >
               {withdrawMutation.isPending ? "Processing..." : "Confirm Withdrawal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Convert Dialog */}
+      <Dialog open={showConvert} onOpenChange={setShowConvert}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Convert Currency</DialogTitle>
+            <DialogDescription>
+              Convert between MERE and USDT instantly
+            </DialogDescription>
+          </DialogHeader>
+
+          <Tabs value={convertDirection} onValueChange={(v) => setConvertDirection(v as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="mere-to-usdt" data-testid="tab-mere-to-usdt">MERE → USDT</TabsTrigger>
+              <TabsTrigger value="usdt-to-mere" data-testid="tab-usdt-to-mere">USDT → MERE</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="mere-to-usdt" className="space-y-4 pt-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Amount (MERE)</label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={convertAmount}
+                  onChange={(e) => setConvertAmount(e.target.value)}
+                  data-testid="input-convert-amount-mere"
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  Available: {formatMERE(mereBalance)} MERE
+                </div>
+              </div>
+
+              {parseFloat(convertAmount) > 0 && (
+                <Card className="p-4 space-y-2 bg-accent/20">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Convert:</span>
+                    <span>{formatMERE(parseFloat(convertAmount))} MERE</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Exchange Rate:</span>
+                    <span>1 MERE = $0.50</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-2 border-t border-border">
+                    <span className="font-semibold">You will receive:</span>
+                    <div className="text-right">
+                      <div className="font-bold text-primary">
+                        {formatUSD(mereToUSD(parseFloat(convertAmount)))} USDT
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="usdt-to-mere" className="space-y-4 pt-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Amount (USDT)</label>
+                <Input
+                  type="number"
+                  placeholder="0.00"
+                  value={convertAmount}
+                  onChange={(e) => setConvertAmount(e.target.value)}
+                  data-testid="input-convert-amount-usdt"
+                />
+                <div className="text-xs text-muted-foreground mt-1">
+                  Available: {formatUSD(usdBalance)} USDT
+                </div>
+              </div>
+
+              {parseFloat(convertAmount) > 0 && (
+                <Card className="p-4 space-y-2 bg-accent/20">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Convert:</span>
+                    <span>{formatUSD(parseFloat(convertAmount))} USDT</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Exchange Rate:</span>
+                    <span>1 USDT = 2 MERE</span>
+                  </div>
+                  <div className="flex justify-between text-sm pt-2 border-t border-border">
+                    <span className="font-semibold">You will receive:</span>
+                    <div className="text-right">
+                      <div className="font-bold text-primary">
+                        {formatMERE(usdToMERE(parseFloat(convertAmount)))} MERE
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+
+          <Card className="p-4 bg-primary/10">
+            <div className="text-sm text-muted-foreground">
+              <strong>Note:</strong> Conversions are instant with no fees. Exchange rate: 1 MERE = $0.50 USDT
+            </div>
+          </Card>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowConvert(false)} data-testid="button-cancel-convert">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConvert}
+              disabled={!convertAmount || parseFloat(convertAmount) <= 0 || convertMutation.isPending}
+              className="bg-gold-gradient text-black font-bold"
+              data-testid="button-confirm-convert"
+            >
+              {convertMutation.isPending ? "Converting..." : "Confirm Conversion"}
             </Button>
           </DialogFooter>
         </DialogContent>

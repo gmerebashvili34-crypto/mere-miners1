@@ -384,6 +384,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/wallet/convert', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      const { fromCurrency, toCurrency, amount } = req.body;
+
+      const convertAmount = parseFloat(amount);
+      if (!convertAmount || convertAmount <= 0) {
+        return res.status(400).json({ message: "Invalid amount" });
+      }
+
+      // Get user balance
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(400).json({ message: "User not found" });
+      }
+
+      let convertedAmount = 0;
+      let description = "";
+
+      if (fromCurrency === "MERE" && toCurrency === "USDT") {
+        // Convert MERE to USDT (1 MERE = 0.5 USDT)
+        if (parseFloat(user.mereBalance) < convertAmount) {
+          return res.status(400).json({ message: "Insufficient MERE balance" });
+        }
+        convertedAmount = convertAmount * 0.5;
+        description = `Converted ${convertAmount} MERE to ${convertedAmount.toFixed(2)} USDT`;
+        // Balance stays the same (MERE to USDT mock conversion for demo)
+      } else if (fromCurrency === "USDT" && toCurrency === "MERE") {
+        // Convert USDT to MERE (1 USDT = 2 MERE)
+        const usdBalance = parseFloat(user.mereBalance) * 0.5;
+        if (usdBalance < convertAmount) {
+          return res.status(400).json({ message: "Insufficient USDT balance" });
+        }
+        convertedAmount = convertAmount * 2;
+        description = `Converted ${convertAmount} USDT to ${convertedAmount.toFixed(2)} MERE`;
+        // Balance stays the same (USDT to MERE mock conversion for demo)
+      } else {
+        return res.status(400).json({ message: "Invalid currency pair" });
+      }
+
+      // Record transaction (mock - balance doesn't change as this is a conversion)
+      await storage.createTransaction({
+        userId,
+        type: "conversion",
+        amountMere: fromCurrency === "MERE" ? convertAmount.toString() : convertedAmount.toString(),
+        amountUsd: fromCurrency === "USDT" ? convertAmount.toString() : convertedAmount.toString(),
+        description,
+        status: "completed",
+      });
+
+      res.json({ success: true, converted: convertedAmount });
+    } catch (error) {
+      console.error("Error processing conversion:", error);
+      res.status(500).json({ message: "Failed to process conversion" });
+    }
+  });
+
   // Leaderboard routes
   app.get('/api/leaderboard', isAuthenticated, async (_req, res) => {
     try {
