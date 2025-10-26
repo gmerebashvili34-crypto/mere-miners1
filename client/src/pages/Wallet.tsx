@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { BottomNav } from "@/components/BottomNav";
 import { Wallet as WalletIcon, ArrowDownToLine, ArrowUpFromLine, Copy, Check, ExternalLink, ArrowLeftRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { formatMERE, formatUSD, mereToUSD, usdToMERE, MERE_TO_USD_RATE } from "@/lib/constants";
+import { formatMERE, mereToUSD, usdToMERE, MERE_TO_USD_RATE } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Transaction } from "@shared/schema";
@@ -221,7 +221,7 @@ export default function Wallet() {
         {/* Exchange Rate Info */}
         <Card className="p-4 bg-accent/10 border-primary/10">
           <div className="text-center text-sm text-muted-foreground">
-            Exchange Rate: <span className="text-foreground font-semibold">1 MERE = 0.50 USDT</span>
+            Exchange Rate: <span className="text-foreground font-semibold">1 MERE = {MERE_TO_USD_RATE.toFixed(2)} USDT</span>
           </div>
         </Card>
 
@@ -331,7 +331,7 @@ export default function Wallet() {
                 <strong>Important:</strong> Only send USDT (TRC-20) to this address. Other tokens will be lost.
               </div>
               <div className="text-sm text-muted-foreground">
-                <strong>Exchange Rate:</strong> 1 USDT = 2 MERE (1 MERE = 0.50 USDT)
+                <strong>Exchange Rate:</strong> 1 USDT = {(1 / MERE_TO_USD_RATE).toFixed(0)} MERE (1 MERE = {MERE_TO_USD_RATE.toFixed(2)} USDT)
               </div>
             </Card>
 
@@ -501,7 +501,7 @@ export default function Wallet() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Exchange Rate:</span>
-                    <span>1 MERE = 0.50 USDT</span>
+                    <span>1 MERE = {MERE_TO_USD_RATE.toFixed(2)} USDT</span>
                   </div>
                   <div className="flex justify-between text-sm pt-2 border-t border-border">
                     <span className="font-semibold">You will receive:</span>
@@ -538,7 +538,7 @@ export default function Wallet() {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Exchange Rate:</span>
-                    <span>1 USDT = 2 MERE</span>
+                    <span>1 USDT = {(1 / MERE_TO_USD_RATE).toFixed(0)} MERE</span>
                   </div>
                   <div className="flex justify-between text-sm pt-2 border-t border-border">
                     <span className="font-semibold">You will receive:</span>
@@ -555,7 +555,7 @@ export default function Wallet() {
 
           <Card className="p-4 bg-primary/10">
             <div className="text-sm text-muted-foreground">
-              <strong>Note:</strong> Conversions are instant with no fees. Exchange rate: 1 MERE = 0.50 USDT
+              <strong>Note:</strong> Conversions are instant with no fees. Exchange rate: 1 MERE = {MERE_TO_USD_RATE.toFixed(2)} USDT
             </div>
           </Card>
 
