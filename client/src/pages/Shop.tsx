@@ -70,7 +70,7 @@ export default function Shop() {
   };
   
   // Check if user already owns this miner type
-  const ownsSelectedMiner = selectedMiner && ownedMiners.some(m => m.minerType.id === selectedMiner.id);
+  const ownsSelectedMiner = selectedMiner ? ownedMiners.some(m => m.minerType.id === selectedMiner.id) : false;
 
   const getTotalCost = () => {
     if (!selectedMiner) return { originalPrice: 0, finalPrice: 0, discountPercent: 0 };
