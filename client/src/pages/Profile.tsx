@@ -93,11 +93,7 @@ export default function Profile() {
 
   const updateNameMutation = useMutation({
     mutationFn: async (data: { firstName: string; lastName: string }) => {
-      return await apiRequest("/api/profile/update-name", {
-        method: "PATCH",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("PATCH", "/api/profile/update-name", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
@@ -117,14 +113,19 @@ export default function Profile() {
   });
 
   const handleEditName = () => {
-    setFirstName(user?.firstName || "");
-    setLastName(user?.lastName || "");
+    const fullName = user?.firstName && user?.lastName 
+      ? `${user.firstName} ${user.lastName}`
+      : user?.firstName || "";
+    setFirstName(fullName);
     setIsEditingName(true);
   };
 
   const handleSaveName = () => {
-    if (firstName.trim() && lastName.trim()) {
-      updateNameMutation.mutate({ firstName: firstName.trim(), lastName: lastName.trim() });
+    if (firstName.trim()) {
+      const nameParts = firstName.trim().split(' ');
+      const firstName_ = nameParts[0] || "";
+      const lastName_ = nameParts.slice(1).join(' ') || nameParts[0] || "";
+      updateNameMutation.mutate({ firstName: firstName_, lastName: lastName_ });
     }
   };
 
@@ -184,24 +185,16 @@ export default function Profile() {
                 </>
               ) : (
                 <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      placeholder="First Name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      data-testid="input-first-name"
-                    />
-                    <Input
-                      placeholder="Last Name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      data-testid="input-last-name"
-                    />
-                  </div>
+                  <Input
+                    placeholder="Name"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    data-testid="input-name"
+                  />
                   <div className="flex gap-2">
                     <Button
                       onClick={handleSaveName}
-                      disabled={!firstName.trim() || !lastName.trim() || updateNameMutation.isPending}
+                      disabled={!firstName.trim() || updateNameMutation.isPending}
                       className="bg-gold-gradient text-black font-bold"
                       data-testid="button-save-name"
                     >

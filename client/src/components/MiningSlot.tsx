@@ -89,16 +89,8 @@ export function MiningSlot({
   return (
     <>
       <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group flex flex-col">
-        {isActive && (
-          <div className="absolute top-1 left-1 z-10">
-            <Badge className="bg-status-online text-white text-[10px] animate-pulse-glow">
-              Active
-            </Badge>
-          </div>
-        )}
-
         {upgradeLevel > 0 && (
-          <div className="absolute top-1 left-1 z-10 mt-5">
+          <div className="absolute top-1 left-1 z-10">
             <Badge className="bg-gold-gradient text-black text-[10px] font-bold">
               Lv {upgradeLevel}
             </Badge>
@@ -106,7 +98,7 @@ export function MiningSlot({
         )}
 
         {miner.boostMultiplier > 1 && (
-          <div className="absolute top-1 left-1 z-10" style={{ marginTop: upgradeLevel > 0 ? '2.5rem' : '1.25rem' }}>
+          <div className="absolute top-1 left-1 z-10" style={{ marginTop: upgradeLevel > 0 ? '1.25rem' : '0.25rem' }}>
             <Badge className="bg-primary text-primary-foreground text-[10px]">
               {miner.boostMultiplier}x
             </Badge>
