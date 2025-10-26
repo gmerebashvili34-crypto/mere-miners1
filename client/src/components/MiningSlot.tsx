@@ -67,14 +67,12 @@ export function MiningSlot({
     );
   }
 
-  // Calculate upgrade multiplier (each level adds 20%)
-  const upgradeMultiplier = 1.0 + (miner.upgradeLevel * 0.2);
-  const dailyYield = miner.minerType.thRate * TH_DAILY_YIELD_MERE * miner.boostMultiplier * upgradeMultiplier;
+  // No upgrade multiplier - upgrades don't affect hashrate
+  const dailyYield = miner.minerType.thRate * TH_DAILY_YIELD_MERE * miner.boostMultiplier;
   const isActive = miner.isActive;
   const upgradeLevel = miner.upgradeLevel || 0;
-  const maxLevel = 5;
-  // Flat upgrade cost: $12.99 USD = 25.98 MERE for all miners
-  const upgradeCost = upgradeLevel < maxLevel ? 25.98 : 0;
+  // Flat upgrade cost: $12.99 USD = 25.98 MERE for all miners (unlimited upgrades)
+  const upgradeCost = 25.98;
 
   return (
     <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group">
@@ -90,7 +88,7 @@ export function MiningSlot({
         </Button>
       )}
 
-      {onUpgradeMiner && upgradeLevel < maxLevel && (
+      {onUpgradeMiner && (
         <Button
           size="icon"
           variant="ghost"
@@ -158,7 +156,7 @@ export function MiningSlot({
           <div className="flex items-center gap-0.5">
             <Zap className="w-2.5 h-2.5 text-primary" />
             <span className="text-muted-foreground">
-              {(miner.minerType.thRate * upgradeMultiplier).toFixed(1)} TH/s
+              {miner.minerType.thRate.toFixed(1)} TH/s
             </span>
           </div>
           <div className="flex items-center gap-0.5">
@@ -171,10 +169,10 @@ export function MiningSlot({
           ≈ {formatUSD(mereToUSD(dailyYield))}/day
         </div>
 
-        {onUpgradeMiner && upgradeLevel < maxLevel && (
+        {onUpgradeMiner && (
           <div className="pt-0.5">
             <p className="text-[10px] text-muted-foreground">
-              Up: {upgradeCost} MERE → +20%
+              Upgrade: {upgradeCost} MERE
             </p>
           </div>
         )}

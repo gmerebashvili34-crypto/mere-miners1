@@ -79,10 +79,8 @@ export class EarningsEngine {
         const lastUpdate = miner.lastUpdate || new Date(Date.now() - 60000);
         const minutesSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60);
         
-        // Calculate upgrade multiplier (each level adds 20%: 1.0, 1.2, 1.4, 1.6, 1.8, 2.0)
-        const upgradeMultiplier = 1.0 + (miner.upgradeLevel * 0.2);
-        
-        const dailyEarnings = TH_DAILY_YIELD_MERE * miner.thRate * (miner.boostMultiplier || 1.0) * upgradeMultiplier;
+        // Upgrades are cosmetic only - no performance bonus
+        const dailyEarnings = TH_DAILY_YIELD_MERE * miner.thRate * (miner.boostMultiplier || 1.0);
         const earningsPerMinute = dailyEarnings / (24 * 60);
         const earnings = earningsPerMinute * minutesSinceUpdate;
 

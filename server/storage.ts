@@ -212,9 +212,6 @@ export class DatabaseStorage implements IStorage {
     const minerType = result[0].miner_types;
 
     const currentLevel = miner.upgradeLevel;
-    if (currentLevel >= 5) {
-      throw new Error("Miner is already at max level");
-    }
 
     // Flat upgrade cost: $12.99 USD = 25.98 MERE for all miners
     const upgradeCost = 25.98;
