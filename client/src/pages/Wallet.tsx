@@ -130,7 +130,7 @@ export default function Wallet() {
     if (!withdrawAddress || withdrawAddress.length < 10) {
       toast({
         title: "Invalid Address",
-        description: "Please enter a valid TRC-20 wallet address",
+        description: "Please enter a valid USDT(TRC-20) wallet address",
         variant: "destructive",
       });
       return;
@@ -417,10 +417,10 @@ export default function Wallet() {
 
           <div className="space-y-4 py-4">
             <div>
-              <label className="text-sm font-medium mb-2 block">Withdrawal Address (TRC-20)</label>
+              <label className="text-sm font-medium mb-2 block">Withdrawal Address USDT(TRC-20)</label>
               <Input
                 type="text"
-                placeholder="TRC-20 wallet address"
+                placeholder="USDT(TRC-20) wallet address"
                 value={withdrawAddress}
                 onChange={(e) => setWithdrawAddress(e.target.value)}
                 className="font-mono text-sm"
@@ -463,7 +463,7 @@ export default function Wallet() {
 
             <Card className="p-4 bg-primary/10">
               <div className="text-sm text-muted-foreground">
-                <strong>Important:</strong> Only withdraw to a valid TRC-20 wallet address. Withdrawals are final and cannot be reversed.
+                <strong>Important:</strong> Only withdraw to a valid USDT(TRC-20) wallet address. Withdrawals are final and cannot be reversed.
               </div>
             </Card>
           </div>
