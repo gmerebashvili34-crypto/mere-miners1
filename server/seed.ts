@@ -18,7 +18,7 @@ async function seed() {
     {
       name: "Cube Miner",
       description: "Entry-level compact mining unit with reliable performance",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Cube_Miner_df655445.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Cube_Miner_c9e82d6a.png",
       thRate: 1.0,
       basePriceUsd: "13.99",
       basePriceMere: "27.98",
@@ -31,7 +31,7 @@ async function seed() {
     {
       name: "Tower Miner",
       description: "Elegant vertical design with enhanced cooling",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Tower_Miner_e7e82e4e.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Tower_Miner_71708957.png",
       thRate: 2.5,
       basePriceUsd: "34.98",
       basePriceMere: "69.96",
@@ -44,7 +44,7 @@ async function seed() {
     {
       name: "Crystal Miner",
       description: "Crystalline structure with prismatic light refraction",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Crystal_Miner_1d9d4571.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Crystal_Miner_1f35bbb9.png",
       thRate: 3.5,
       basePriceUsd: "48.98",
       basePriceMere: "97.96",
@@ -57,7 +57,7 @@ async function seed() {
     {
       name: "Sphere Miner",
       description: "Advanced spherical design with hexagonal pattern",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Sphere_Miner_73ef060f.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Sphere_Miner_77b3bcb5.png",
       thRate: 5.0,
       basePriceUsd: "69.95",
       basePriceMere: "139.90",
@@ -70,7 +70,7 @@ async function seed() {
     {
       name: "Spiral Reactor",
       description: "Spiral design with advanced cooling system",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Spiral_Reactor_b5d19ded.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Spiral_Reactor_a1f600d1.png",
       thRate: 7.5,
       basePriceUsd: "104.93",
       basePriceMere: "209.86",
@@ -83,7 +83,7 @@ async function seed() {
     {
       name: "Quantum Box",
       description: "Minimalist high-performance mining unit",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Quantum_Box_0113fbe1.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Quantum_Box_c28c5e6a.png",
       thRate: 10.0,
       basePriceUsd: "139.90",
       basePriceMere: "279.80",
@@ -96,7 +96,7 @@ async function seed() {
     {
       name: "Fusion Core",
       description: "Compact fusion reactor with quantum processing",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Fusion_Core_42614645.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Fusion_Core_75d5c989.png",
       thRate: 15.0,
       basePriceUsd: "209.85",
       basePriceMere: "419.70",
@@ -109,7 +109,7 @@ async function seed() {
     {
       name: "Titan Core",
       description: "Industrial-grade processing with triple redundancy",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Titan_Core_83a39a31.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Titan_Core_835834c5.png",
       thRate: 20.0,
       basePriceUsd: "279.80",
       basePriceMere: "559.60",
@@ -122,7 +122,7 @@ async function seed() {
     {
       name: "Pyramid Elite",
       description: "Elite-tier supercomputer with holographic circuitry",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Pyramid_Elite_7d5b9b3d.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Pyramid_Elite_826f6c77.png",
       thRate: 25.0,
       basePriceUsd: "349.75",
       basePriceMere: "699.50",
@@ -135,7 +135,7 @@ async function seed() {
     {
       name: "Mega Fortress",
       description: "Ultimate powerhouse with AI-driven optimization",
-      imageUrl: "/attached_assets/generated_images/Luxury_Black_Gold_Mega_Fortress_0fe903cd.png",
+      imageUrl: "/attached_assets/generated_images/Black_Background_Mega_Fortress_0d82d9de.png",
       thRate: 50.0,
       basePriceUsd: "699.50",
       basePriceMere: "1399.00",
