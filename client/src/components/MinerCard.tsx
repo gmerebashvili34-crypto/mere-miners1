@@ -22,6 +22,18 @@ export function MinerCard({ miner, onPurchase, isPurchasing, showPurchaseButton 
     }
   };
 
+  // Calculate rarity-based discount
+  const getDiscountPercent = (rarity: string) => {
+    if (rarity === "rare") return 4;
+    if (rarity === "epic") return 5;
+    if (rarity === "legendary") return 7;
+    return 0;
+  };
+
+  const discountPercent = getDiscountPercent(miner.rarity);
+  const basePrice = parseFloat(miner.basePriceMere);
+  const finalPrice = discountPercent > 0 ? basePrice * (1 - discountPercent / 100) : basePrice;
+
   const rarityBadge = (
     <Badge className={`${getRarityColor(miner.rarity)} uppercase text-xs font-bold`}>
       {miner.rarity}
@@ -90,13 +102,34 @@ export function MinerCard({ miner, onPurchase, isPurchasing, showPurchaseButton 
 
         <div className="pt-2 border-t border-border">
           <div className="flex items-baseline justify-between mb-3">
-            <div>
-              <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
-                {formatMERE(miner.basePriceMere)}
-              </div>
-              <div className="text-xs text-muted-foreground">
-                ≈ {formatUSD(mereToUSD(parseFloat(miner.basePriceMere)))}
-              </div>
+            <div className="flex-1">
+              {discountPercent > 0 ? (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="text-lg font-display font-bold text-muted-foreground line-through">
+                      {formatMERE(miner.basePriceMere)}
+                    </div>
+                    <Badge className="bg-primary text-primary-foreground text-xs">
+                      -{discountPercent}%
+                    </Badge>
+                  </div>
+                  <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
+                    {formatMERE(finalPrice.toFixed(2))}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ≈ {formatUSD(mereToUSD(finalPrice))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
+                    {formatMERE(miner.basePriceMere)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    ≈ {formatUSD(mereToUSD(basePrice))}
+                  </div>
+                </>
+              )}
             </div>
           </div>
 

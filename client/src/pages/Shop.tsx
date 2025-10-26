@@ -74,13 +74,20 @@ export default function Shop() {
 
   const getTotalCost = () => {
     if (!selectedMiner) return { originalPrice: 0, finalPrice: 0, discountPercent: 0 };
-    // Each miner is purchasable only once (quantity = 1)
-    const pricePerUnit = parseFloat(selectedMiner.basePriceMere);
+    
+    // Calculate rarity-based discount
+    let discountPercent = 0;
+    if (selectedMiner.rarity === "rare") discountPercent = 4;
+    else if (selectedMiner.rarity === "epic") discountPercent = 5;
+    else if (selectedMiner.rarity === "legendary") discountPercent = 7;
+    
+    const originalPrice = parseFloat(selectedMiner.basePriceMere);
+    const finalPrice = originalPrice * (1 - discountPercent / 100);
     
     return {
-      originalPrice: pricePerUnit,
-      finalPrice: pricePerUnit,
-      discountPercent: 0,
+      originalPrice,
+      finalPrice,
+      discountPercent,
     };
   };
 
@@ -178,14 +185,28 @@ export default function Shop() {
                 </Card>
 
                 <Card className="p-4 bg-card border-primary/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold">Price:</span>
-                    <div className="text-right">
-                      <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
-                        {formatMERE(cost.finalPrice)}
+                  <div className="space-y-2">
+                    {cost.discountPercent > 0 && (
+                      <div className="flex items-center justify-between pb-2 border-b border-border">
+                        <span className="text-sm text-muted-foreground">Original Price:</span>
+                        <span className="text-sm line-through text-muted-foreground">{formatMERE(cost.originalPrice)}</span>
                       </div>
-                      <div className="text-xs text-muted-foreground">
-                        ≈ {formatUSD(mereToUSD(cost.finalPrice))}
+                    )}
+                    {cost.discountPercent > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-semibold">Discount:</span>
+                        <span className="text-sm font-semibold text-primary">-{cost.discountPercent}%</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between pt-2 border-t border-border">
+                      <span className="font-semibold">Final Price:</span>
+                      <div className="text-right">
+                        <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
+                          {formatMERE(cost.finalPrice.toFixed(2))}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          ≈ {formatUSD(mereToUSD(cost.finalPrice))}
+                        </div>
                       </div>
                     </div>
                   </div>

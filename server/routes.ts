@@ -144,8 +144,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "You already own this miner type. Each miner can only be purchased once." });
       }
 
-      // Use base price (no bulk discounts, quantity is always 1)
-      const finalCost = parseFloat(minerType.basePriceMere);
+      // Apply rarity-based discount
+      let discountPercent = 0;
+      if (minerType.rarity === "rare") discountPercent = 4;
+      else if (minerType.rarity === "epic") discountPercent = 5;
+      else if (minerType.rarity === "legendary") discountPercent = 7;
+      
+      const basePrice = parseFloat(minerType.basePriceMere);
+      const finalCost = basePrice * (1 - discountPercent / 100);
 
       // Check user balance
       const user = await storage.getUser(userId);
@@ -166,14 +172,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Record transaction
+      const description = discountPercent > 0 
+        ? `Purchased ${minerType.name} (-${discountPercent}% ${minerType.rarity} discount)`
+        : `Purchased ${minerType.name}`;
+      
       await storage.createTransaction({
         userId,
         type: "purchase",
-        amountMere: finalCost.toString(),
-        amountUsd: (finalCost * 0.5).toString(),
-        description: `Purchased ${minerType.name}`,
+        amountMere: finalCost.toFixed(2),
+        amountUsd: (finalCost * 0.5).toFixed(2),
+        description,
         status: "completed",
-        metadata: { minerTypeId, quantity: 1 },
+        metadata: { minerTypeId, quantity: 1, discount: discountPercent, originalPrice: basePrice },
       });
 
       // Check and unlock achievements
