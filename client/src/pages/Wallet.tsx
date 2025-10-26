@@ -42,7 +42,7 @@ export default function Wallet() {
   const generateDepositMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/wallet/deposit/generate", {});
-      return response;
+      return response.json();
     },
     onSuccess: (data: any) => {
       setDepositAddress(data.address);
