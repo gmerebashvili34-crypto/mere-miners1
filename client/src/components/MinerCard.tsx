@@ -116,8 +116,8 @@ export function MinerCard({ miner, onPurchase, isPurchasing, showPurchaseButton 
                   <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
                     {formatMERE(finalPrice.toFixed(2))}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    ≈ {formatUSD(mereToUSD(finalPrice))}
+                  <div className="text-xs text-muted-foreground font-semibold">
+                    MERE
                   </div>
                 </>
               ) : (
@@ -125,8 +125,8 @@ export function MinerCard({ miner, onPurchase, isPurchasing, showPurchaseButton 
                   <div className="text-2xl font-display font-bold bg-gold-gradient bg-clip-text text-transparent">
                     {formatMERE(miner.basePriceMere)}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    ≈ {formatUSD(mereToUSD(basePrice))}
+                  <div className="text-xs text-muted-foreground font-semibold">
+                    MERE
                   </div>
                 </>
               )}
