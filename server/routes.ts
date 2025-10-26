@@ -808,6 +808,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Miner Match game routes
+  app.get('/api/games/miner-match/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      
+      const lastGame = await storage.getLastDailyGame(userId, 'miner_match');
+      
+      if (!lastGame) {
+        return res.json({ 
+          canPlay: true, 
+          lastPlayedAt: null,
+          nextPlayAt: null 
+        });
+      }
+      
+      const lastPlayedAt = new Date(lastGame.lastPlayedAt);
+      const now = new Date();
+      const nextPlayAt = new Date(lastPlayedAt);
+      nextPlayAt.setHours(24, 0, 0, 0);
+      
+      const canPlay = now >= nextPlayAt;
+      
+      res.json({
+        canPlay,
+        lastPlayedAt: lastPlayedAt.toISOString(),
+        nextPlayAt: nextPlayAt.toISOString(),
+        lastReward: lastGame.rewardMere,
+        lastMoves: lastGame.metadata?.moves,
+      });
+    } catch (error) {
+      console.error("Error checking miner match status:", error);
+      res.status(500).json({ message: "Failed to check game status" });
+    }
+  });
+
+  app.post('/api/games/miner-match/play', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      
+      // Check if user can play
+      const lastGame = await storage.getLastDailyGame(userId, 'miner_match');
+      
+      if (lastGame) {
+        const lastPlayedAt = new Date(lastGame.lastPlayedAt);
+        const now = new Date();
+        const nextPlayAt = new Date(lastPlayedAt);
+        nextPlayAt.setHours(24, 0, 0, 0);
+        
+        if (now < nextPlayAt) {
+          return res.status(400).json({ 
+            message: "You've already played today. Come back tomorrow!",
+            nextPlayAt: nextPlayAt.toISOString()
+          });
+        }
+      }
+      
+      const { moves } = req.body;
+      
+      // Calculate reward based on moves (fewer moves = better reward)
+      // Perfect game (12 moves = 6 pairs) = 10 MERE
+      // Each extra move reduces reward by 0.5 MERE, minimum 1 MERE
+      let rewardMere: string;
+      if (moves <= 12) {
+        rewardMere = '10.00';
+      } else {
+        const extraMoves = moves - 12;
+        const penalty = extraMoves * 0.5;
+        const reward = Math.max(1, 10 - penalty);
+        rewardMere = reward.toFixed(2);
+      }
+      
+      // Play the game and credit reward
+      const game = await storage.playDailyGame(userId, 'miner_match', rewardMere, { moves });
+      
+      res.json({
+        success: true,
+        reward: rewardMere,
+        moves,
+        playedAt: game.lastPlayedAt,
+      });
+    } catch (error) {
+      console.error("Error playing miner match:", error);
+      res.status(500).json({ message: "Failed to play game" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
