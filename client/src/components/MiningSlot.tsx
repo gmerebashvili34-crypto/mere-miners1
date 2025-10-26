@@ -1,9 +1,20 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Plus, Zap, TrendingUp, X, ArrowUp } from "lucide-react";
 import type { UserMiner, MinerType } from "@shared/schema";
 import { formatMERE, mereToUSD, TH_DAILY_YIELD_MERE } from "@/lib/constants";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface MiningSlotProps {
   slotNumber: number;
@@ -26,6 +37,7 @@ export function MiningSlot({
   isLocked = false,
   onUnlock 
 }: MiningSlotProps) {
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   if (isLocked) {
     return (
       <Card className="relative aspect-square border-2 border-dashed border-border bg-accent/20 hover-elevate">
@@ -75,98 +87,128 @@ export function MiningSlot({
   const upgradeCost = 25.98;
 
   return (
-    <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group flex flex-col">
-      {onRemoveMiner && (
-        <Button
-          size="icon"
-          variant="ghost"
-          className="absolute top-2 right-2 z-10 w-6 h-6 rounded-full bg-black/50 hover:bg-destructive transition-colors"
-          onClick={() => onRemoveMiner(miner.id)}
-          data-testid={`button-remove-miner-${miner.id}`}
-        >
-          <X className="w-3.5 h-3.5 text-white" />
-        </Button>
-      )}
-
-      {isActive && (
-        <div className="absolute top-1 left-1 z-10">
-          <Badge className="bg-status-online text-white text-[10px] animate-pulse-glow">
-            Active
-          </Badge>
-        </div>
-      )}
-
-      {upgradeLevel > 0 && (
-        <div className="absolute top-1 left-1 z-10 mt-5">
-          <Badge className="bg-gold-gradient text-black text-[10px] font-bold">
-            Lv {upgradeLevel}
-          </Badge>
-        </div>
-      )}
-
-      {miner.boostMultiplier > 1 && (
-        <div className="absolute top-1 left-1 z-10" style={{ marginTop: upgradeLevel > 0 ? '2.5rem' : '1.25rem' }}>
-          <Badge className="bg-primary text-primary-foreground text-[10px]">
-            {miner.boostMultiplier}x
-          </Badge>
-        </div>
-      )}
-
-      <div className="relative h-[60%] bg-gradient-to-br from-background/50 to-accent/30 p-2 flex items-center justify-center">
-        <div className="w-full h-full flex items-center justify-center">
-          <img
-            src={miner.minerType.imageUrl}
-            alt={miner.minerType.name}
-            className="max-w-[85%] max-h-[85%] object-contain animate-float"
-            data-testid={`img-placed-miner-${miner.id}`}
-          />
-        </div>
-        
+    <>
+      <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group flex flex-col">
         {isActive && (
-          <>
-            <div className="absolute inset-0 pointer-events-none">
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-primary/10 rounded-full blur-2xl animate-pulse-glow" />
-            </div>
-            {/* Particle effects */}
-            <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '0ms' }} />
-            <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '500ms' }} />
-            <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '1000ms' }} />
-          </>
+          <div className="absolute top-1 left-1 z-10">
+            <Badge className="bg-status-online text-white text-[10px] animate-pulse-glow">
+              Active
+            </Badge>
+          </div>
         )}
-      </div>
 
-      <div className="flex-1 p-2 space-y-1">
-        <h4 className="font-semibold text-xs text-foreground truncate" data-testid={`text-placed-miner-name-${miner.id}`}>
-          {miner.minerType.name}
-        </h4>
-        
-        <div className="grid grid-cols-2 gap-1 text-[10px]">
-          <div className="flex items-center gap-0.5">
-            <Zap className="w-2.5 h-2.5 text-primary" />
-            <span className="text-muted-foreground">
-              {miner.minerType.thRate.toFixed(1)} TH/s
-            </span>
+        {upgradeLevel > 0 && (
+          <div className="absolute top-1 left-1 z-10 mt-5">
+            <Badge className="bg-gold-gradient text-black text-[10px] font-bold">
+              Lv {upgradeLevel}
+            </Badge>
           </div>
-          <div className="flex items-center gap-0.5">
-            <TrendingUp className="w-2.5 h-2.5 text-primary" />
-            <span className="font-semibold text-primary text-[9px]">{formatMERE(dailyYield)}/d</span>
+        )}
+
+        {miner.boostMultiplier > 1 && (
+          <div className="absolute top-1 left-1 z-10" style={{ marginTop: upgradeLevel > 0 ? '2.5rem' : '1.25rem' }}>
+            <Badge className="bg-primary text-primary-foreground text-[10px]">
+              {miner.boostMultiplier}x
+            </Badge>
+          </div>
+        )}
+
+        <div className="relative h-[60%] bg-gradient-to-br from-background/50 to-accent/30 p-2 flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center">
+            <img
+              src={miner.minerType.imageUrl}
+              alt={miner.minerType.name}
+              className="max-w-[85%] max-h-[85%] object-contain animate-float"
+              data-testid={`img-placed-miner-${miner.id}`}
+            />
+          </div>
+          
+          {isActive && (
+            <>
+              <div className="absolute inset-0 pointer-events-none">
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-primary/10 rounded-full blur-2xl animate-pulse-glow" />
+              </div>
+              {/* Particle effects */}
+              <div className="absolute top-1/4 left-1/4 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '0ms' }} />
+              <div className="absolute top-1/3 right-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '500ms' }} />
+              <div className="absolute bottom-1/3 left-1/3 w-1 h-1 bg-primary rounded-full animate-sparkle" style={{ animationDelay: '1000ms' }} />
+            </>
+          )}
+        </div>
+
+        <div className="flex-1 p-2 space-y-1">
+          <h4 className="font-semibold text-xs text-foreground truncate" data-testid={`text-placed-miner-name-${miner.id}`}>
+            {miner.minerType.name}
+          </h4>
+          
+          <div className="grid grid-cols-2 gap-1 text-[10px]">
+            <div className="flex items-center gap-0.5">
+              <Zap className="w-2.5 h-2.5 text-primary" />
+              <span className="text-muted-foreground">
+                {miner.minerType.thRate.toFixed(1)} TH/s
+              </span>
+            </div>
+            <div className="flex items-center gap-0.5">
+              <TrendingUp className="w-2.5 h-2.5 text-primary" />
+              <span className="font-semibold text-primary text-[9px]">{formatMERE(dailyYield)}/d</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {onUpgradeMiner && (
-        <div className="p-2 pt-0 mt-auto">
-          <Button
-            size="sm"
-            onClick={() => onUpgradeMiner(miner.id)}
-            className="w-full h-7 bg-gold-gradient text-black font-bold text-[10px] flex items-center justify-center gap-1"
-            data-testid={`button-upgrade-miner-${miner.id}`}
-          >
-            <ArrowUp className="w-3 h-3" />
-            <span>Upgrade ({upgradeCost} MERE)</span>
-          </Button>
+        <div className="p-2 pt-0 mt-auto space-y-1">
+          {onUpgradeMiner && (
+            <Button
+              size="sm"
+              onClick={() => onUpgradeMiner(miner.id)}
+              className="w-full h-7 bg-gold-gradient text-black font-bold text-[10px] flex items-center justify-center gap-1"
+              data-testid={`button-upgrade-miner-${miner.id}`}
+            >
+              <ArrowUp className="w-3 h-3" />
+              <span>Upgrade ({upgradeCost} MERE)</span>
+            </Button>
+          )}
+          
+          {onRemoveMiner && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowRemoveConfirm(true)}
+              className="w-full h-7 border-destructive/50 text-destructive hover:bg-destructive hover:text-white text-[10px] flex items-center justify-center gap-1"
+              data-testid={`button-remove-miner-${miner.id}`}
+            >
+              <X className="w-3 h-3" />
+              <span>Remove</span>
+            </Button>
+          )}
         </div>
-      )}
-    </Card>
+      </Card>
+
+    {/* Remove Confirmation Dialog */}
+    {onRemoveMiner && (
+      <AlertDialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Miner?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove <strong>{miner?.minerType.name}</strong> from this slot? The miner will be moved to your inventory and stop earning MERE.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-remove">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                onRemoveMiner(miner.id);
+                setShowRemoveConfirm(false);
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+              data-testid="button-confirm-remove"
+            >
+              Remove Miner
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
+  </>
   );
 }
