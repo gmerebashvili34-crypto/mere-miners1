@@ -1167,45 +1167,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/games/daily-spin/play', isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = requireUserId(req, res);
-      if (!userId) return;
-      
-      // Check if user can play
-      const lastGame = await storage.getLastDailyGame(userId, 'daily_spin');
-      
-      if (lastGame) {
-        const lastPlayedAt = new Date(lastGame.lastPlayedAt);
-        const now = new Date();
-        const nextPlayAt = new Date(lastPlayedAt);
-        nextPlayAt.setHours(24, 0, 0, 0);
-        
-        if (now < nextPlayAt) {
-          return res.status(400).json({ 
-            message: "You've already played today. Come back tomorrow!",
-            nextPlayAt: nextPlayAt.toISOString()
-          });
-        }
-      }
-      
-      // Generate random reward (0.01-0.05 MERE)
-      const rewardMere = (0.01 + Math.random() * 0.04).toFixed(2);
-      
-      // Play the game and credit reward
-      const game = await storage.playDailyGame(userId, 'daily_spin', rewardMere);
-      
-      res.json({
-        success: true,
-        reward: rewardMere,
-        playedAt: game.lastPlayedAt,
-      });
-    } catch (error) {
-      console.error("Error playing daily spin:", error);
-      res.status(500).json({ message: "Failed to play game" });
-    }
-  });
-
   // Lucky Draw game routes
   app.get('/api/games/lucky-draw/status', isAuthenticated, async (req: any, res) => {
     try {
@@ -1494,6 +1455,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error('admin sweeps error:', err);
       res.status(500).json({ message: err.message || 'Failed to load sweeps' });
+    }
+  });
+
+  // Admin: trigger a single withdraw worker iteration (for cron on serverless)
+  app.post('/api/admin/withdraw/run-once', requireAdminJwt, async (_req, res) => {
+    try {
+      const BATCH = parseInt(process.env.WITHDRAW_BATCH_SIZE || '5', 10);
+      const pick = await db.execute(sql`
+        UPDATE usdt_withdrawals
+        SET status='locked', updated_at=now()
+        WHERE id IN (
+          SELECT id FROM usdt_withdrawals WHERE status='queued' ORDER BY created_at ASC LIMIT ${BATCH}
+        )
+        RETURNING id, user_id, destination_address, amount_usdt
+      `);
+      const rows = (pick as any).rows as Array<{ id: string; user_id: string; destination_address: string; amount_usdt: number }>;
+      const { processWithdrawalRecord } = await import('./controllers/usdtWithdrawController');
+      const results: Array<{ id: string; ok: boolean; error?: string }> = [];
+      for (const r of rows) {
+        try {
+          await processWithdrawalRecord(r);
+          results.push({ id: r.id, ok: true });
+        } catch (err: any) {
+          results.push({ id: r.id, ok: false, error: err?.message || String(err) });
+        }
+      }
+      res.json({ success: true, picked: rows.length, results });
+    } catch (err: any) {
+      console.error('[admin withdraw run-once] error:', err);
+      res.status(500).json({ message: err.message || 'run-once failed' });
+    }
+  });
+
+  // Admin: trigger a single sweep pass (for cron on serverless)
+  app.post('/api/admin/sweep/run-once', requireAdminJwt, async (_req, res) => {
+    try {
+      const enabledRaw = (process.env.SWEEP_ENABLED || '').trim();
+      const enabled = enabledRaw.toLowerCase() === 'true' || enabledRaw === '1' || enabledRaw.toLowerCase() === 'yes';
+      if (!enabled) {
+        return res.status(400).json({ message: 'Sweeper disabled (set SWEEP_ENABLED=true)' });
+      }
+      const minUsdt = parseFloat(process.env.SWEEP_MIN_USDT || '1');
+      const minTrxForGas = parseFloat(process.env.SWEEP_MIN_TRX || '10');
+      const topupTrxAmount = parseFloat(process.env.SWEEP_TOPUP_TRX || '20');
+
+      const platformKey = process.env.COLD_WALLET_PRIVATE_KEY || process.env.TRON_PRIVATE_KEY || '';
+      if (!platformKey) {
+        return res.status(400).json({ message: 'No platform private key set' });
+      }
+
+      const { getTronWeb, getUSDTBalance, buildAndSendTRC20 } = await import('./lib/tron');
+      const { tronService } = await import('./tronService');
+      const platformAddr = tronService.getPlatformWalletAddress?.() || (() => {
+        try { const tw = getTronWeb(platformKey); /* @ts-ignore */ return tw.address.fromPrivateKey(platformKey); } catch { return ''; }
+      })();
+      if (!platformAddr) return res.status(400).json({ message: 'Could not derive platform address' });
+
+      const uw = await db.execute(sql`SELECT user_id, address, encrypted_private_key FROM user_wallets WHERE address IS NOT NULL AND encrypted_private_key IS NOT NULL LIMIT 50`);
+      const rows = (uw as any).rows as Array<{ user_id: string; address: string; encrypted_private_key: string }>;
+
+      const twQuery = getTronWeb();
+      const { decryptString } = await import('./lib/crypto');
+      const actions: Array<{ address: string; swept?: number; txid?: string; topup?: number; skipped?: string }>= [];
+      for (const r of rows) {
+        try {
+          const usdtBal = await getUSDTBalance(r.address);
+          if (usdtBal < minUsdt) { actions.push({ address: r.address, skipped: 'low_usdt' }); continue; }
+          const trxBalSun = await twQuery.trx.getBalance(r.address);
+          const trxBal = trxBalSun / 1_000_000;
+          if (trxBal < minTrxForGas) {
+            try {
+              const twPlatform = getTronWeb(platformKey);
+              const toSun = Math.floor(topupTrxAmount * 1_000_000);
+              await twPlatform.trx.sendTransaction(r.address, toSun);
+              actions.push({ address: r.address, topup: topupTrxAmount });
+              continue;
+            } catch (e) {
+              actions.push({ address: r.address, skipped: 'topup_failed' });
+              continue;
+            }
+          }
+          const pk = decryptString(r.encrypted_private_key);
+          const txid = await buildAndSendTRC20({ fromPrivateKey: pk, to: platformAddr, amountUSDT: usdtBal });
+          await db.execute(sql`INSERT INTO admin_actions (action, details) VALUES ('deposit_sweep', jsonb_build_object('from', ${r.address}, 'to', ${platformAddr}, 'amount_usdt', ${usdtBal}, 'txid', ${txid}))`);
+          actions.push({ address: r.address, swept: usdtBal, txid });
+        } catch (e: any) {
+          actions.push({ address: r.address, skipped: e?.message || 'error' });
+        }
+      }
+      res.json({ success: true, actions });
+    } catch (err: any) {
+      console.error('[admin sweep run-once] error:', err);
+      res.status(500).json({ message: err.message || 'run-once failed' });
+    }
+  });
+
+  // Admin: trigger a single deposit scan over all known wallets (for cron on serverless)
+  app.post('/api/admin/deposits/scan-once', requireAdminJwt, async (_req, res) => {
+    try {
+      const { scanAddressAndRecord } = await import('./controllers/usdtDepositController');
+      const rows = await db.execute(sql`SELECT address FROM user_wallets WHERE address IS NOT NULL`);
+      const addrs = ((rows as any).rows || []).map((r: any) => r.address as string);
+      const results: Array<{ address: string; ok: boolean; error?: string }> = [];
+      for (const addr of addrs) {
+        try {
+          await scanAddressAndRecord(addr);
+          results.push({ address: addr, ok: true });
+        } catch (e: any) {
+          results.push({ address: addr, ok: false, error: e?.message || 'error' });
+        }
+      }
+      res.json({ success: true, scanned: addrs.length, results });
+    } catch (err: any) {
+      console.error('[admin deposits scan-once] error:', err);
+      res.status(500).json({ message: err.message || 'scan-once failed' });
     }
   });
 

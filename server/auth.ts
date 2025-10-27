@@ -15,6 +15,12 @@ export function getSession() {
   if (!process.env.SESSION_SECRET) {
     console.warn("[auth] SESSION_SECRET is not set. Using a development default. Set SESSION_SECRET in .env for production.");
   }
+  // Make cookie behavior friendlier for Vercel/HTTPS deployments
+  const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
+  const isVercel = !!process.env.VERCEL;
+  const cookieSecure = process.env.COOKIE_SECURE === 'true' || isVercel || isProd;
+  // On Vercel previews/custom domains, treat as cross-site safe
+  const cookieSameSite: 'lax' | 'none' = isVercel ? 'none' : 'lax';
   return session({
     secret,
     store: sessionStore,
@@ -22,10 +28,9 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      // Important: allow running locally over http even in production builds
-      // Opt-in to secure cookies with COOKIE_SECURE=true in real HTTPS environments
-      secure: process.env.COOKIE_SECURE === 'true',
-      sameSite: 'lax',
+      // Secure cookies for production/Vercel; allow http locally if not
+      secure: cookieSecure,
+      sameSite: cookieSameSite,
       maxAge: sessionTtl,
     },
   });
