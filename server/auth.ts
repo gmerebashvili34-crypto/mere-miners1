@@ -19,8 +19,10 @@ export function getSession() {
   const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
   const isVercel = !!process.env.VERCEL;
   const cookieSecure = process.env.COOKIE_SECURE === 'true' || isVercel || isProd;
-  // On Vercel previews/custom domains, treat as cross-site safe
-  const cookieSameSite: 'lax' | 'none' = isVercel ? 'none' : 'lax';
+  // In any HTTPS/production scenario, allow cross-site for reliability with custom domains
+  const cookieSameSite: 'lax' | 'none' = cookieSecure ? 'none' : 'lax';
+  // Optional explicit cookie domain for custom domains (e.g., example.com or .example.com)
+  const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
   return session({
     secret,
     store: sessionStore,
@@ -31,6 +33,7 @@ export function getSession() {
       // Secure cookies for production/Vercel; allow http locally if not
       secure: cookieSecure,
       sameSite: cookieSameSite,
+      domain: cookieDomain,
       maxAge: sessionTtl,
     },
   });

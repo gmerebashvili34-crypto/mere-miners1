@@ -10,7 +10,7 @@ import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
 import { signUp, signIn, requireUserId } from "./emailAuth";
 import jwt from 'jsonwebtoken';
-import { sendMail } from './emailer.ts';
+import { sendMail } from './emailer';
 import { tronService, tronEnabled } from "./tronService";
 import { getTronWeb, getUSDTBalance } from './lib/tron';
 import { verifyGoogleIdToken, findOrCreateGoogleUser } from './authGoogle';
@@ -238,11 +238,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       // Clear cookie on client to avoid stale session id
       try {
-        const cookieName = (req.session as any)?.cookie?.name || 'connect.sid';
+        const cookieName = 'connect.sid';
+        const cookieSecure = process.env.COOKIE_SECURE === 'true' || !!process.env.VERCEL || (process.env.NODE_ENV||'').toLowerCase()==='production';
+        const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
         res.clearCookie(cookieName, {
           httpOnly: true,
-          secure: process.env.COOKIE_SECURE === 'true',
-          sameSite: 'lax',
+          secure: cookieSecure,
+          sameSite: cookieSecure ? 'none' : 'lax',
+          path: '/',
+          domain: cookieDomain,
         });
       } catch {}
       res.json({ success: true });
@@ -277,6 +281,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
     }
+  });
+
+  // Debug endpoint: report session ID and userId for troubleshooting auth issues
+  app.get('/api/auth/debug', (req: any, res) => {
+    const cookie = req.headers['cookie'] || '';
+    res.json({
+      hasCookie: Boolean(cookie.includes('connect.sid=')),
+      sessionId: req.sessionID,
+      userId: req.session?.userId || null,
+      secure: (req as any).protocol === 'https',
+      headers: {
+        host: req.headers.host,
+        'x-forwarded-proto': req.headers['x-forwarded-proto'],
+        'x-forwarded-host': req.headers['x-forwarded-host'],
+      },
+    });
   });
 
   // Helper function to get user ID from either auth method

@@ -8,9 +8,11 @@ export function useAuth() {
     // Treat 401 as null instead of throwing to avoid error states
     queryFn: getQueryFn({ on401: "returnNull" }),
     retry: false,
-    refetchInterval: 5000, // keep balance updated in real-time
-    refetchOnWindowFocus: true,
-    staleTime: 0,
+    // Avoid aggressive periodic refetches that can cause auth flicker on some hosts
+    refetchInterval: false,
+    refetchOnWindowFocus: false,
+    // Cache until an explicit invalidate, SignIn/SignUp invalidate on success
+    staleTime: Infinity,
   });
 
   return {
