@@ -46,7 +46,7 @@ export function getSession() {
     saveUninitialized: false,
     cookie: {
       httpOnly: true,
-      // Secure cookies for production/Vercel; allow http locally if not
+  // Secure cookies for production; allow http locally if not
       secure: cookieSecure,
       sameSite: cookieSameSite,
       domain: cookieDomain,
