@@ -290,6 +290,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       hasCookie: Boolean(cookie.includes('connect.sid=')),
       sessionId: req.sessionID,
       userId: req.session?.userId || null,
+      store: (globalThis as any).__SESSION_STORE_TYPE || 'unknown',
       secure: (req as any).protocol === 'https',
       headers: {
         host: req.headers.host,
@@ -305,6 +306,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (sessionUserId) return sessionUserId;
     return null;
   }
+
+  // Basic health checks
+  app.get('/api/health/db', async (_req, res) => {
+    try {
+      const r = await db.execute(sql`SELECT 1 as ok`);
+      res.json({ ok: true, result: (r as any).rows?.[0] || null });
+    } catch (e: any) {
+      res.status(500).json({ ok: false, error: e?.message || String(e) });
+    }
+  });
+  app.get('/api/health/env', (_req, res) => {
+    res.json({
+      hasDatabaseUrl: Boolean(process.env.DATABASE_URL),
+      hasSessionSecret: Boolean(process.env.SESSION_SECRET),
+      hasJwtSecret: Boolean(process.env.JWT_SECRET),
+      cookieSecure: process.env.COOKIE_SECURE,
+      vercel: Boolean(process.env.VERCEL),
+    });
+  });
 
   // Profile routes
   app.patch('/api/profile/update-name', isAuthenticated, async (req: any, res) => {
@@ -628,15 +648,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Store on users table (legacy) and also in user_wallets for scanners
       const secret = process.env.WALLET_KEY_SECRET;
       if (secret) {
-        // Encrypt private key at rest using pgcrypto for legacy users table
-        await db
-          .update(users)
-          .set({ 
-            depositAddress: acct.address, 
-            depositPrivateKey: sql`pgp_sym_encrypt(${acct.privateKey}, ${secret})`, 
-            updatedAt: new Date() 
-          } as any)
-          .where(eq(users.id, userId));
+        try {
+          // Encrypt private key at rest using pgcrypto for legacy users table
+          await db
+            .update(users)
+            .set({ 
+              depositAddress: acct.address, 
+              depositPrivateKey: sql`pgp_sym_encrypt(${acct.privateKey}, ${secret})`, 
+              updatedAt: new Date() 
+            } as any)
+            .where(eq(users.id, userId));
+        } catch (e) {
+          console.warn('[wallet] pgcrypto encrypt failed; falling back to plaintext storage on users table:', (e as any)?.message || e);
+          await db
+            .update(users)
+            .set({ depositAddress: acct.address, depositPrivateKey: acct.privateKey, updatedAt: new Date() })
+            .where(eq(users.id, userId));
+        }
       } else {
         console.warn('[wallet] WALLET_KEY_SECRET not set. Storing deposit private key in plaintext.');
         await db

@@ -4,13 +4,30 @@ import connectPg from "connect-pg-simple";
 
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  const hasDb = Boolean(process.env.DATABASE_URL);
   const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: true,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  let sessionStore: session.Store;
+  // Expose which store we are using for debug endpoints
+  try { (globalThis as any).__SESSION_STORE_TYPE = undefined; } catch {}
+  if (!hasDb) {
+    console.warn("[auth] DATABASE_URL not set. Falling back to in-memory session store (not durable). Set DATABASE_URL for production.");
+    sessionStore = new session.MemoryStore();
+    try { (globalThis as any).__SESSION_STORE_TYPE = 'memory'; } catch {}
+  } else {
+    try {
+      sessionStore = new pgStore({
+        conString: process.env.DATABASE_URL,
+        createTableIfMissing: true,
+        ttl: sessionTtl,
+        tableName: "sessions",
+      });
+      try { (globalThis as any).__SESSION_STORE_TYPE = 'postgres'; } catch {}
+    } catch (e) {
+      console.error("[auth] Failed to initialize Postgres session store. Falling back to memory store:", (e as any)?.message || e);
+      sessionStore = new session.MemoryStore();
+      try { (globalThis as any).__SESSION_STORE_TYPE = 'memory'; } catch {}
+    }
+  }
   const secret = process.env.SESSION_SECRET || "dev-session-secret-change-me";
   if (!process.env.SESSION_SECRET) {
     console.warn("[auth] SESSION_SECRET is not set. Using a development default. Set SESSION_SECRET in .env for production.");
