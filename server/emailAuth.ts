@@ -1,7 +1,7 @@
 import { db } from "./db";
 import { users } from "@shared/schema";
 import { eq } from "drizzle-orm";
-import bcrypt from "bcrypt";
+import { hashPassword, verifyPassword } from "./lib/bcrypt";
 import { nanoid } from "nanoid";
 import type { Request, Response } from "express";
 
@@ -34,7 +34,7 @@ export async function signUp(
   }
 
   // Hash password
-  const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+  const passwordHash = await hashPassword(password, SALT_ROUNDS);
 
   // Handle referral
   let referredById: string | null = null;
@@ -86,7 +86,7 @@ export async function signIn(email: string, password: string) {
   }
 
   // Verify password
-  const isValid = await bcrypt.compare(password, user.passwordHash);
+  const isValid = await verifyPassword(password, user.passwordHash);
   
   if (!isValid) {
     throw new Error("Invalid email or password");

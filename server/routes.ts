@@ -221,9 +221,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const userId = payload?.sub as string;
       if (!userId) return res.status(400).json({ message: 'Invalid token' });
-      const bcrypt = (await import('bcrypt')).default;
+      const { hashPassword } = await import('./lib/bcrypt');
       const SALT_ROUNDS = 10;
-      const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+      const passwordHash = await hashPassword(password, SALT_ROUNDS);
       await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
       res.json({ success: true });
     } catch (err: any) {
