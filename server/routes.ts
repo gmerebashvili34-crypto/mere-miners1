@@ -239,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Clear cookie on client to avoid stale session id
       try {
         const cookieName = 'connect.sid';
-        const cookieSecure = process.env.COOKIE_SECURE === 'true' || !!process.env.VERCEL || (process.env.NODE_ENV||'').toLowerCase()==='production';
+  const cookieSecure = process.env.COOKIE_SECURE === 'true' || (process.env.NODE_ENV||'').toLowerCase()==='production';
         const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
         res.clearCookie(cookieName, {
           httpOnly: true,
@@ -322,7 +322,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       hasSessionSecret: Boolean(process.env.SESSION_SECRET),
       hasJwtSecret: Boolean(process.env.JWT_SECRET),
       cookieSecure: process.env.COOKIE_SECURE,
-      vercel: Boolean(process.env.VERCEL),
     });
   });
 

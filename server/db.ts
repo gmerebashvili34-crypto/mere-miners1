@@ -26,7 +26,7 @@ export const pool: import('pg').Pool = HAS_DB
 function createDisabledDbProxy(): any {
   const err = () => {
     throw new Error(
-      "Database not configured. Set DATABASE_URL in your environment (Vercel Project Settings → Environment Variables)."
+  "Database not configured. Set DATABASE_URL in your deployment environment variables."
     );
   };
   return new Proxy(

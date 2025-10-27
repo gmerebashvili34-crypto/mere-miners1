@@ -32,11 +32,10 @@ export function getSession() {
   if (!process.env.SESSION_SECRET) {
     console.warn("[auth] SESSION_SECRET is not set. Using a development default. Set SESSION_SECRET in .env for production.");
   }
-  // Make cookie behavior friendlier for Vercel/HTTPS deployments
+  // Cookie behavior for HTTPS deployments
   const isProd = (process.env.NODE_ENV || '').toLowerCase() === 'production';
-  const isVercel = !!process.env.VERCEL;
-  const cookieSecure = process.env.COOKIE_SECURE === 'true' || isVercel || isProd;
-  // In any HTTPS/production scenario, allow cross-site for reliability with custom domains
+  const cookieSecure = process.env.COOKIE_SECURE === 'true' || isProd;
+  // In HTTPS/production, allow cross-site for reliability with custom domains
   const cookieSameSite: 'lax' | 'none' = cookieSecure ? 'none' : 'lax';
   // Optional explicit cookie domain for custom domains (e.g., example.com or .example.com)
   const cookieDomain = process.env.COOKIE_DOMAIN || undefined;
