@@ -1,15 +1,26 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
-import { calculateDiscountedPrice, TH_DAILY_YIELD_MERE, SLOT_EXPANSION_PRICE_MERE } from "@shared/constants";
+import { setupAuth, isAuthenticated } from "./auth";
+import { calculateDiscountedPrice, TH_DAILY_YIELD_MERE, SLOT_EXPANSION_PRICE_MERE, WITHDRAWAL_FEE_PERCENT, MIN_WITHDRAW_USDT } from "@shared/constants";
 import { db } from "./db";
 import { achievements, userAchievements, users, minerTypes, userMiners, transactions, seasons, seasonPassRewards } from "@shared/schema";
 import { eq, sum, count, sql, isNotNull, and } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
 import { signUp, signIn, requireUserId } from "./emailAuth";
-import { tronService } from "./tronService";
+import jwt from 'jsonwebtoken';
+import { sendMail } from './emailer.ts';
+import { tronService, tronEnabled } from "./tronService";
+import { getTronWeb, getUSDTBalance } from './lib/tron';
+import { verifyGoogleIdToken, findOrCreateGoogleUser } from './authGoogle';
+import { encryptString } from './lib/crypto';
+import multer from 'multer';
+import { uploadBuffer } from './storageFiles';
+import { requireAdminJwt, requireUserJwt } from './authJwt';
+import { adminCreateWallet } from './controllers/usdtWalletController';
+import { webhookDeposit } from './controllers/usdtDepositController';
+import { requestWithdrawal } from './controllers/usdtWithdrawController';
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -21,9 +32,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password, referralCode } = req.body;
       
       const user = await signUp(email, password, referralCode);
+      // Regenerate session to prevent fixation and ensure cookie is set before responding
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) return reject(err);
+          (req.session as any).userId = user.id;
+          req.session.save((saveErr) => {
+            if (saveErr) return reject(saveErr);
+            resolve();
+          });
+        });
+      });
       
-      // Set session
-      (req.session as any).userId = user.id;
+      // Signup bonus: grant a 1 TH/s trial miner for 7 days and auto-place it in slot 1
+      try {
+        const now = new Date();
+        const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        
+        // Try to find an existing 1 TH/s miner type (Cube Miner by seed)
+        let oneThMiner = (await storage.getMinerTypes()).find((m) => m.thRate === 1.0) || null;
+        
+        // If not found (e.g., seed not run), create a hidden starter type
+        if (!oneThMiner) {
+          oneThMiner = await storage.createMinerType({
+            name: "Starter Trial Miner",
+            description: "1 TH/s trial miner for new users (7 days)",
+            imageUrl: "/attached_assets/generated_images/Black_Background_Cube_Miner_c9e82d6a.png",
+            thRate: 1.0,
+            basePriceUsd: "0.00",
+            basePriceMere: "0.00",
+            dailyYieldUsd: "0.08",
+            dailyYieldMere: "0.16",
+            roiDays: 7,
+            rarity: "common",
+            isAvailable: false, // hidden from shop
+          });
+        }
+        
+        await storage.createUserMiner({
+          userId: user.id,
+          minerTypeId: oneThMiner.id,
+          slotPosition: 1,
+          isActive: true,
+          boostMultiplier: 1.0,
+          upgradeLevel: 0,
+          // trial flags
+          isTemporary: true as any,
+          expiresAt: expires as any,
+        } as any);
+      } catch (bonusErr) {
+        console.warn("Signup bonus grant failed (non-fatal):", bonusErr);
+      }
       
       res.json({ success: true, user: {
         id: user.id,
@@ -46,9 +105,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { email, password } = req.body;
       
       const user = await signIn(email, password);
-      
-      // Set session
-      (req.session as any).userId = user.id;
+      // Regenerate session to prevent fixation and ensure cookie is set before responding
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err) => {
+          if (err) return reject(err);
+          (req.session as any).userId = user.id;
+          req.session.save((saveErr) => {
+            if (saveErr) return reject(saveErr);
+            resolve();
+          });
+        });
+      });
       
       res.json({ success: true, user: {
         id: user.id,
@@ -66,34 +133,146 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Google sign-in/up with ID token (from Google Identity Services on the client)
+  app.post('/api/auth/google', async (req: any, res) => {
+    try {
+      const { idToken } = req.body || {};
+      if (!idToken) return res.status(400).json({ message: 'Missing idToken' });
+      const payload = await verifyGoogleIdToken(idToken);
+      if (!payload?.email) return res.status(400).json({ message: 'Invalid Google token' });
+      const user = await findOrCreateGoogleUser(payload.email);
+
+      // establish session
+      await new Promise<void>((resolve, reject) => {
+        req.session.regenerate((err: any) => {
+          if (err) return reject(err);
+          (req.session as any).userId = user.id;
+          req.session.save((saveErr: any) => saveErr ? reject(saveErr) : resolve());
+        });
+      });
+
+      res.json({ success: true, user: {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        mereBalance: user.mereBalance,
+        totalMined: user.totalMined,
+        referralCode: user.referralCode,
+        isAdmin: user.isAdmin,
+      }});
+    } catch (err: any) {
+      console.error('Google sign-in failed:', err);
+      res.status(400).json({ message: err.message || 'Google sign-in failed' });
+    }
+  });
+
+  // Forgot password: issue a short-lived reset token and email/log a reset link
+  app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+      const { email } = req.body || {};
+      if (!email) return res.status(400).json({ message: 'Email is required' });
+      const [user] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+      // Always respond success to avoid account enumeration
+      if (!user) return res.json({ success: true });
+
+      // Users who signed up with Google may not have a password; still allow set
+      const secret = process.env.JWT_SECRET || 'dev-secret';
+      const token = jwt.sign({ sub: user.id, email: user.email, type: 'pwreset' }, secret, { expiresIn: '15m' });
+      const origin = (req.headers['x-forwarded-host'] as string) || req.headers.host || `localhost:${process.env.PORT || 3000}`;
+      const proto = (req.headers['x-forwarded-proto'] as string) || 'http';
+      const link = `${proto}://${origin}/reset-password?token=${encodeURIComponent(token)}`;
+
+      // Try to send email if SMTP is configured; otherwise, log reset URL
+      let exposeDevLink = false;
+      try {
+        await sendMail({
+          to: user.email!,
+          subject: 'Reset your MereMiners password',
+          html: `<p>Click the link below to reset your password. This link expires in 15 minutes.</p><p><a href="${link}">${link}</a></p>`,
+        });
+      } catch (e) {
+        console.warn('[auth] SMTP not configured or send failed; reset link:', link);
+        // In development, include the link in the JSON response so you can proceed without SMTP
+        exposeDevLink = process.env.NODE_ENV !== 'production' || (process.env.EXPOSE_RESET_LINK_DEV === 'true');
+      }
+
+      if (exposeDevLink) {
+        return res.json({ success: true, devLink: link });
+      }
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || 'Failed to start reset' });
+    }
+  });
+
+  // Reset password using JWT token
+  app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+      const { token, password } = req.body || {};
+      if (!token || !password) return res.status(400).json({ message: 'Invalid request' });
+      if (String(password).length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+      const secret = process.env.JWT_SECRET || 'dev-secret';
+      let payload: any;
+      try {
+        payload = jwt.verify(token, secret);
+      } catch (e: any) {
+        return res.status(400).json({ message: 'Invalid or expired token' });
+      }
+      const userId = payload?.sub as string;
+      if (!userId) return res.status(400).json({ message: 'Invalid token' });
+      const bcrypt = (await import('bcrypt')).default;
+      const SALT_ROUNDS = 10;
+      const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+      await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || 'Failed to reset password' });
+    }
+  });
+
   app.post('/api/auth/logout', (req, res) => {
     req.session.destroy((err) => {
       if (err) {
         return res.status(500).json({ message: "Failed to log out" });
       }
+      // Clear cookie on client to avoid stale session id
+      try {
+        const cookieName = (req.session as any)?.cookie?.name || 'connect.sid';
+        res.clearCookie(cookieName, {
+          httpOnly: true,
+          secure: process.env.COOKIE_SECURE === 'true',
+          sameSite: 'lax',
+        });
+      } catch {}
       res.json({ success: true });
     });
   });
 
-  // Auth routes (supports both Replit Auth and email/password)
+  // Auth routes (email/password + session)
   app.get('/api/auth/user', async (req: any, res) => {
     try {
-      // Check email/password session first
       const sessionUserId = (req.session as any)?.userId;
-      if (sessionUserId) {
-        const user = await storage.getUser(sessionUserId);
-        return res.json(user);
-      }
-      
-      // Fall back to Replit Auth
-      if (req.user?.claims?.sub) {
-        const userId = requireUserId(req, res);
-      if (!userId) return;
-        const user = await storage.getUser(userId);
-        return res.json(user);
-      }
-      
-      res.status(401).json({ message: "Unauthorized" });
+      if (!sessionUserId) return res.status(401).json({ message: "Unauthorized" });
+      const user = await storage.getUser(sessionUserId);
+      if (!user) return res.status(404).json({ message: 'User not found' });
+      // Sanitize sensitive fields before sending to client
+      const safe = {
+        id: user.id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        profileImageUrl: user.profileImageUrl,
+        mereBalance: user.mereBalance,
+        usdtBalance: user.usdtBalance,
+        totalMined: user.totalMined,
+        referralCode: user.referralCode,
+        depositAddress: user.depositAddress,
+        isAdmin: user.isAdmin,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      } as const;
+      return res.json(safe);
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ message: "Failed to fetch user" });
@@ -104,7 +283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   function getUserId(req: any): string | null {
     const sessionUserId = req.session?.userId;
     if (sessionUserId) return sessionUserId;
-    return req.user?.claims?.sub || null;
+    return null;
   }
 
   // Profile routes
@@ -374,91 +553,185 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // File upload route (Supabase Storage)
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+  app.post('/api/storage/upload', isAuthenticated, upload.single('file'), async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+  const file = req.file as any;
+      if (!file) return res.status(400).json({ message: 'No file provided' });
+
+      const result = await uploadBuffer({
+        userId,
+        filename: file.originalname,
+        buffer: file.buffer,
+        contentType: file.mimetype,
+      });
+
+      res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error('Upload failed:', error);
+      res.status(500).json({ message: error.message || 'Upload failed' });
+    }
+  });
+
   app.post('/api/wallet/deposit/generate', isAuthenticated, async (req: any, res) => {
     try {
-      // Return the platform wallet address for deposits
-      // Using single platform wallet (Option A)
-      const depositAddress = tronService.getPlatformWalletAddress();
-      res.json({ address: depositAddress });
+      if (!tronEnabled) {
+        return res.status(503).json({ message: 'Blockchain is not configured' });
+      }
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+
+      // If user already has a deposit address, return it
+      const user = await storage.getUser(userId);
+      if (user?.depositAddress) {
+        // Safety: if somehow it was set to the platform wallet address, or reused by another user, replace it
+        const platformAddr = tronService.getPlatformWalletAddress?.() || '';
+        const isPlatformAddr = platformAddr && user.depositAddress === platformAddr;
+        const ownerOfAddress = await storage.getUserByDepositAddress(user.depositAddress);
+        const ownedBySomeoneElse = ownerOfAddress && ownerOfAddress.id !== userId;
+        if (!isPlatformAddr && !ownedBySomeoneElse) {
+          return res.json({ address: user.depositAddress });
+        }
+        // Otherwise fall through to regenerate a unique one
+      }
+
+  // Generate a unique TRON address for this user
+      let acct = await tronService.createAccount();
+      // Ensure uniqueness at DB level: if collision (extremely unlikely), regenerate once
+      const existingOwner = await storage.getUserByDepositAddress(acct.address);
+      if (existingOwner) {
+        acct = await tronService.createAccount();
+      }
+      // Store on users table (legacy) and also in user_wallets for scanners
+      const secret = process.env.WALLET_KEY_SECRET;
+      if (secret) {
+        // Encrypt private key at rest using pgcrypto for legacy users table
+        await db
+          .update(users)
+          .set({ 
+            depositAddress: acct.address, 
+            depositPrivateKey: sql`pgp_sym_encrypt(${acct.privateKey}, ${secret})`, 
+            updatedAt: new Date() 
+          } as any)
+          .where(eq(users.id, userId));
+      } else {
+        console.warn('[wallet] WALLET_KEY_SECRET not set. Storing deposit private key in plaintext.');
+        await db
+          .update(users)
+          .set({ depositAddress: acct.address, depositPrivateKey: acct.privateKey, updatedAt: new Date() })
+          .where(eq(users.id, userId));
+      }
+
+      // Also upsert into user_wallets (preferred, AES-GCM via ENCRYPTION_KEY)
+      try {
+        const enc = encryptString(acct.privateKey);
+        await db.execute(sql`
+          INSERT INTO user_wallets (user_id, address, encrypted_private_key, note)
+          VALUES (${userId}, ${acct.address}, ${enc}, ${'hot wallet'})
+          ON CONFLICT (user_id)
+          DO UPDATE SET address = EXCLUDED.address, encrypted_private_key = EXCLUDED.encrypted_private_key, updated_at = now()
+        `);
+      } catch (e) {
+        console.warn('[wallet] Failed to upsert user_wallets (continuing):', (e as any)?.message || e);
+      }
+
+      return res.json({ address: acct.address });
     } catch (error) {
       console.error("Error generating deposit address:", error);
       res.status(500).json({ message: "Failed to generate deposit address" });
     }
   });
 
-  app.post('/api/wallet/withdraw', isAuthenticated, async (req: any, res) => {
+  // Link user's TRON sender address for automatic deposit credit
+  app.post('/api/wallet/deposit/link-address', isAuthenticated, async (req: any, res) => {
+    try {
+      // With per-user auto-generated addresses, manual linking is no longer necessary.
+      // Keep endpoint for backward compatibility: just return current user's address.
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      const user = await storage.getUser(userId);
+      if (!user?.depositAddress) {
+        return res.status(404).json({ message: 'No deposit address assigned. Generate first.' });
+      }
+      return res.json({ success: true, address: user.depositAddress });
+    } catch (error) {
+      console.error('Error linking deposit address:', error);
+      res.status(500).json({ message: 'Failed to link address' });
+    }
+  });
+
+  // Force-scan the current user's deposit address now (useful for debugging)
+  app.get('/api/wallet/deposit/scan-now', isAuthenticated, async (req: any, res) => {
     try {
       const userId = requireUserId(req, res);
       if (!userId) return;
-      const { amountMere, address } = req.body;
+      // Prefer user_wallets address; fallback to legacy users.depositAddress
+      const row = await db.execute(sql`SELECT address FROM user_wallets WHERE user_id=${userId} LIMIT 1`);
+      const address = (row as any).rows?.[0]?.address as string | undefined;
+      const addr = address || (await storage.getUser(userId))?.depositAddress;
+      if (!addr) return res.status(404).json({ message: 'No deposit address assigned' });
+      const { scanAddressAndRecord } = await import('./controllers/usdtDepositController');
+      await scanAddressAndRecord(addr);
+      const recent = await db.execute(sql`SELECT txid, amount_usdt, status, created_at FROM usdt_deposits WHERE user_id=${userId} ORDER BY created_at DESC LIMIT 10`);
+      res.json({ success: true, address: addr, deposits: (recent as any).rows || [] });
+    } catch (err: any) {
+      console.error('scan-now error:', err);
+      res.status(500).json({ message: err.message || 'scan failed' });
+    }
+  });
 
-      const amount = parseFloat(amountMere);
-      if (!amount || amount <= 0) {
-        return res.status(400).json({ message: "Invalid amount" });
+  app.post('/api/wallet/withdraw', isAuthenticated, async (req: any, res) => {
+    try {
+      if (!tronEnabled) {
+        return res.status(503).json({ message: 'Blockchain is not configured' });
+      }
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+
+      const { amountUsdt, address } = req.body || {};
+      const amtUsdt = parseFloat(amountUsdt);
+      if (!amtUsdt || amtUsdt <= 0) {
+        return res.status(400).json({ message: 'Invalid amount' });
+      }
+      if (!address || !address.trim() || !tronService.isValidAddress(address)) {
+        return res.status(400).json({ message: 'Invalid TRON address' });
       }
 
-      if (!address || !address.trim()) {
-        return res.status(400).json({ message: "Withdrawal address is required" });
+      if (amtUsdt < MIN_WITHDRAW_USDT) {
+        return res.status(400).json({ message: `Minimum withdrawal is ${MIN_WITHDRAW_USDT} USDT` });
       }
 
-      // Check balance
+      // Ensure the user has enough USDT balance (do not deduct here; worker will deduct atomically)
       const user = await storage.getUser(userId);
-      if (!user || parseFloat(user.mereBalance) < amount) {
-        return res.status(400).json({ message: "Insufficient balance" });
+      if (!user || parseFloat(user.usdtBalance) < amtUsdt) {
+        return res.status(400).json({ message: 'Insufficient USDT balance' });
       }
 
-      // Calculate fee (2%)
-      const fee = amount * 0.02;
-      const amountAfterFee = amount - fee;
-      
-      // Convert MERE to USDT (1 MERE = 0.5 USDT)
-      const usdtAmount = amountAfterFee * 0.5;
+      // Queue withdrawal; worker will process and broadcast
+      const r = await db.execute(sql`
+        INSERT INTO usdt_withdrawals (user_id, destination_address, amount_usdt, status)
+        VALUES (${userId}, ${address}, ${amtUsdt}, 'queued')
+        RETURNING id
+      `);
+      const id = (r as any).rows?.[0]?.id as string | undefined;
 
-      // Deduct from balance first
-      await storage.updateUserBalance(userId, amount.toString(), "subtract");
+      // Optional: record a pending transaction entry
+      await storage.createTransaction({
+        userId,
+        type: 'withdrawal',
+        amountMere: '0',
+        amountUsd: amtUsdt.toFixed(2),
+        description: `USDT withdrawal queued (${amtUsdt.toFixed(2)} USDT)`,
+        status: 'pending',
+      });
 
-      try {
-        // Send USDT via TronGrid
-        console.log(`💸 Processing withdrawal: ${usdtAmount} USDT to ${address}`);
-        const txHash = await tronService.sendUSDT(address, usdtAmount);
-        
-        // Record successful transaction
-        await storage.createTransaction({
-          userId,
-          type: "withdrawal",
-          amountMere: amount.toString(),
-          amountUsd: usdtAmount.toFixed(2),
-          description: `Withdrawal (Fee: ${fee.toFixed(2)} MERE)`,
-          status: "completed",
-          txHash,
-        });
-
-        res.json({ 
-          success: true, 
-          amount: amountAfterFee,
-          usdtAmount,
-          txHash,
-        });
-      } catch (blockchainError: any) {
-        // Refund the user if blockchain transaction fails
-        console.error("Blockchain withdrawal failed, refunding user:", blockchainError);
-        await storage.updateUserBalance(userId, amount.toString(), "add");
-        
-        // Record failed transaction
-        await storage.createTransaction({
-          userId,
-          type: "withdrawal",
-          amountMere: amount.toString(),
-          amountUsd: usdtAmount.toFixed(2),
-          description: `Failed withdrawal (Refunded): ${blockchainError.message}`,
-          status: "failed",
-        });
-        
-        throw blockchainError;
-      }
+      return res.json({ success: true, queued: true, id });
     } catch (error: any) {
-      console.error("Error processing withdrawal:", error);
-      res.status(500).json({ message: error.message || "Failed to process withdrawal" });
+      console.error('Error processing withdrawal:', error);
+      res.status(500).json({ message: error.message || 'Failed to process withdrawal' });
     }
   });
 
@@ -732,45 +1005,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Reward already claimed" });
       }
 
-      // Claim reward
+      // Mark as claimed
       await storage.claimSeasonPassReward(userId, season.id, rewardId);
 
-      // Grant the reward based on type
+      // Grant the reward based on type (credit balances; no blockchain ops here)
       if (reward.rewardType === "mere" && reward.rewardValue) {
-        // Credit MERE to user balance
-        const amount = parseFloat(reward.rewardValue);
-        await storage.updateUserBalance(userId, amount.toString(), "add");
-        
-        // Create transaction record
+        const value = Number(reward.rewardValue);
+        if (isNaN(value) || value <= 0) {
+          return res.status(400).json({ message: "Invalid reward value" });
+        }
+        await db
+          .update(users)
+          .set({ mereBalance: sql`${users.mereBalance} + ${value}`, updatedAt: new Date() })
+          .where(eq(users.id, userId));
+
         await storage.createTransaction({
           userId,
           type: "reward",
-          amountMere: amount.toString(),
-          description: `Season Pass Tier ${reward.tier} Reward`,
+          amountMere: value.toFixed(2),
+          amountUsd: (value * 0.5).toFixed(2),
+          description: `Season pass reward: +${value.toFixed(2)} MERE (tier ${reward.tier})`,
           status: "completed",
         });
-      } else if (reward.rewardType === "booster" && reward.rewardMetadata) {
-        // Apply hashrate booster to all active miners
-        const metadata = reward.rewardMetadata as any;
-        const boostMultiplier = metadata.multiplier || 1.0;
-        
-        await db.update(userMiners)
-          .set({ boostMultiplier: sql`${userMiners.boostMultiplier} * ${boostMultiplier}` })
-          .where(and(
-            eq(userMiners.userId, userId),
-            eq(userMiners.isActive, true)
-          ));
-      }
-      // Note: "miner" and "skin" rewards would require additional implementation
+      } else if (reward.rewardType === "usdt" && reward.rewardValue) {
+        const value = Number(reward.rewardValue);
+        if (isNaN(value) || value <= 0) {
+          return res.status(400).json({ message: "Invalid reward value" });
+        }
+        await db
+          .update(users)
+          .set({ usdtBalance: sql`${users.usdtBalance} + ${value}`, updatedAt: new Date() })
+          .where(eq(users.id, userId));
 
-      res.json({ success: true, reward });
+        await storage.createTransaction({
+          userId,
+          type: "reward",
+          amountMere: '0',
+          amountUsd: value.toFixed(2),
+          description: `Season pass reward: +${value.toFixed(2)} USDT (tier ${reward.tier})`,
+          status: "completed",
+        });
+      }
+
+      return res.json({ success: true, claimed: true, reward: { type: reward.rewardType, value: reward.rewardValue } });
     } catch (error) {
-      console.error("Error claiming reward:", error);
+      console.error("Error claiming season pass reward:", error);
       res.status(500).json({ message: "Failed to claim reward" });
     }
   });
 
-  // Achievements routes
   app.get('/api/achievements', isAuthenticated, async (req: any, res) => {
     try {
       const userId = requireUserId(req, res);
@@ -842,6 +1125,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error checking daily spin status:", error);
       res.status(500).json({ message: "Failed to check game status" });
+    }
+  });
+
+  app.post('/api/games/daily-spin/play', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = requireUserId(req, res);
+      if (!userId) return;
+      
+      // Check if user can play
+      const lastGame = await storage.getLastDailyGame(userId, 'daily_spin');
+      
+      if (lastGame) {
+        const lastPlayedAt = new Date(lastGame.lastPlayedAt);
+        const now = new Date();
+        const nextPlayAt = new Date(lastPlayedAt);
+        nextPlayAt.setHours(24, 0, 0, 0);
+        
+        if (now < nextPlayAt) {
+          return res.status(400).json({ 
+            message: "You've already played today. Come back tomorrow!",
+            nextPlayAt: nextPlayAt.toISOString()
+          });
+        }
+      }
+      
+      // Generate random reward (0.01-0.05 MERE)
+      const rewardMere = (0.01 + Math.random() * 0.04).toFixed(2);
+      
+      // Play the game and credit reward
+      const game = await storage.playDailyGame(userId, 'daily_spin', rewardMere);
+      
+      res.json({
+        success: true,
+        reward: rewardMere,
+        playedAt: game.lastPlayedAt,
+      });
+    } catch (error) {
+      console.error("Error playing daily spin:", error);
+      res.status(500).json({ message: "Failed to play game" });
     }
   });
 
@@ -1079,5 +1401,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   const httpServer = createServer(app);
+
+  // System status endpoint
+  app.get('/api/system/status', (_req, res) => {
+    try {
+      const earnings = require('./earnings');
+      const { depositMonitor } = require('./depositMonitor');
+      const status = {
+        tronEnabled,
+        earnings: earnings.earningsEngine.getStatus(),
+        deposits: depositMonitor.getStatus(),
+        time: new Date().toISOString(),
+      };
+      res.json(status);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || 'Status error' });
+    }
+  });
+
+  // =====================
+  // USDT (TRC-20) endpoints (JWT-protected)
+  // =====================
+  // Admin: create per-user hot wallet (address + encrypted key)
+  app.post('/api/admin/create-wallet', requireAdminJwt, adminCreateWallet);
+  // Optional: TronGrid webhook receiver for deposits
+  app.post('/webhook/deposit', webhookDeposit);
+  // User: queue a USDT withdrawal (processed by worker)
+  app.post('/api/usdt/withdraw', requireUserJwt, requestWithdrawal);
+
+  // Admin health dashboard (JWT admin)
+  app.get('/api/admin/health', requireAdminJwt, async (_req, res) => {
+    try {
+      const { getCurrentBlockNumber } = await import('./lib/tron');
+      const tw = getTronWeb(process.env.COLD_WALLET_PRIVATE_KEY);
+      const addr = process.env.COLD_WALLET_PRIVATE_KEY ? tw.address.fromPrivateKey(process.env.COLD_WALLET_PRIVATE_KEY) : undefined;
+      const trxBal = addr ? (await tw.trx.getBalance(addr)) / 1_000_000 : null;
+      const block = await getCurrentBlockNumber();
+      const pending = await (await import('./db')).db.execute(require('drizzle-orm').sql`SELECT COUNT(1) as c FROM usdt_withdrawals WHERE status IN ('queued','locked','processing')`);
+      const c = Number(((pending as any).rows?.[0]?.c) || 0);
+      res.json({ tron: { address: addr, trxBalance: trxBal, currentBlock: block }, withdrawals: { pending: c } });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message || 'health error' });
+    }
+  });
+
+  // Admin view: sweeper status and sweepable wallets (session admin)
+  app.get('/api/admin/sweeps', isAuthenticated, async (req: any, res) => {
+    try {
+      const adminId = getUserId(req);
+      if (!adminId) return res.status(401).json({ message: 'Unauthorized' });
+      const me = await storage.getUser(adminId);
+      if (!me?.isAdmin) return res.status(403).json({ message: 'Forbidden' });
+
+      const tw = getTronWeb(process.env.COLD_WALLET_PRIVATE_KEY);
+      const platformAddress = process.env.COLD_WALLET_PRIVATE_KEY ? tw.address.fromPrivateKey(process.env.COLD_WALLET_PRIVATE_KEY) : null;
+      let platformTrx: number | null = null;
+      let platformUsdt: number | null = null;
+      if (platformAddress) {
+        platformTrx = (await tw.trx.getBalance(platformAddress)) / 1_000_000;
+        platformUsdt = await getUSDTBalance(platformAddress);
+      }
+
+      const SWEEP_MIN_USDT = parseFloat(process.env.SWEEP_MIN_USDT || '1');
+      // Fetch recent sweep actions
+      const recent = await db.execute(sql`SELECT id, action, details, created_at FROM admin_actions WHERE action = 'deposit_sweep' ORDER BY created_at DESC LIMIT 20`);
+
+      // Sample a set of user wallets to estimate sweepable balances
+      const uw = await db.execute(sql`SELECT user_id, address FROM user_wallets WHERE address IS NOT NULL ORDER BY updated_at DESC LIMIT 50`);
+      const wallets: Array<{ userId: string; address: string; usdt: number; trx: number; sweepable: boolean }>= [];
+      const rows = (uw as any).rows || [];
+      for (const r of rows) {
+        const address = r.address as string;
+        try {
+          const [usdt, trxRaw] = await Promise.all([
+            getUSDTBalance(address),
+            tw.trx.getBalance(address),
+          ]);
+          const trx = trxRaw / 1_000_000;
+          wallets.push({ userId: r.user_id, address, usdt, trx, sweepable: usdt >= SWEEP_MIN_USDT });
+        } catch {
+          // ignore individual failures
+        }
+      }
+
+      res.json({
+        platform: { address: platformAddress, trx: platformTrx, usdt: platformUsdt },
+        sweepEnabled: (process.env.SWEEP_ENABLED || 'false') === 'true',
+        thresholdUSDT: SWEEP_MIN_USDT,
+        recent: (recent as any).rows || [],
+        wallets,
+      });
+    } catch (err: any) {
+      console.error('admin sweeps error:', err);
+      res.status(500).json({ message: err.message || 'Failed to load sweeps' });
+    }
+  });
+
   return httpServer;
 }

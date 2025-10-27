@@ -11,6 +11,7 @@ import { formatMERE, formatUSD, mereToUSD } from "@/lib/constants";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 
 interface AchievementWithProgress {
@@ -51,6 +52,7 @@ export default function Profile() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [, setLocation] = useLocation();
 
   const { data: achievements } = useQuery<AchievementWithProgress[]>({
     queryKey: ["/api/achievements"],
@@ -87,8 +89,22 @@ export default function Profile() {
     }
   };
 
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/auth/logout");
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      // After logout, send users to public landing page instead of sign-in
+      setLocation("/");
+    },
+    onError: () => {
+      toast({ title: "Logout failed", description: "Please try again.", variant: "destructive" });
+    },
+  });
+
   const handleLogout = () => {
-    window.location.href = "/api/logout";
+    logoutMutation.mutate();
   };
 
   const updateNameMutation = useMutation({
@@ -402,6 +418,18 @@ export default function Profile() {
             </div>
           )}
         </Card>
+
+        {/* Admin tools */}
+        {user?.isAdmin && (
+          <Card className="p-6 border-primary/40 bg-primary/5">
+            <h3 className="font-display font-bold text-lg mb-4">Admin</h3>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Button onClick={() => setLocation('/admin/sweeps')} className="w-full">
+                Open Sweeps Dashboard
+              </Button>
+            </div>
+          </Card>
+        )}
 
         {/* Account Actions */}
         <Card className="p-6 border-destructive/30">

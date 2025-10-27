@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { BottomNav } from "@/components/BottomNav";
 import { Wallet as WalletIcon, ArrowDownToLine, ArrowUpFromLine, Copy, Check, ExternalLink, ArrowLeftRight } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { formatMERE, mereToUSD, usdToMERE, MERE_TO_USD_RATE } from "@/lib/constants";
+import { formatMERE, mereToUSD, usdToMERE, MERE_TO_USD_RATE, WITHDRAWAL_FEE_PERCENT } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Transaction } from "@shared/schema";
@@ -32,6 +32,7 @@ export default function Wallet() {
   const [depositAddress, setDepositAddress] = useState("");
   const [copied, setCopied] = useState(false);
   const [withdrawAddress, setWithdrawAddress] = useState("");
+  // per-user deposit address (auto-generated server-side)
 
   // Fetch transactions
   const { data: transactions = [] } = useQuery<Transaction[]>({
@@ -47,13 +48,21 @@ export default function Wallet() {
     onSuccess: (data: any) => {
       setDepositAddress(data.address);
     },
+    onError: (err: Error) => {
+      toast({ title: "Deposit unavailable", description: err.message || "Blockchain not configured", variant: "destructive" });
+    }
   });
+
+  // Keep local deposit address in sync with user (if already generated)
+  useEffect(() => {
+    if (user?.depositAddress) setDepositAddress(user.depositAddress);
+  }, [user?.depositAddress]);
 
   // Withdraw mutation
   const withdrawMutation = useMutation({
     mutationFn: async (data: { amountUsdt: string, address: string }) => {
       await apiRequest("POST", "/api/wallet/withdraw", { 
-        amountMere: usdToMERE(parseFloat(data.amountUsdt)).toString(),
+        amountUsdt: data.amountUsdt,
         address: data.address
       });
     },
@@ -113,9 +122,8 @@ export default function Wallet() {
 
   const handleDeposit = () => {
     setShowDeposit(true);
-    if (!depositAddress) {
-      generateDepositMutation.mutate();
-    }
+    // Always ask server to ensure a valid unique per-user address is set/returned
+    generateDepositMutation.mutate();
   };
 
   const handleWithdraw = () => {
@@ -190,7 +198,7 @@ export default function Wallet() {
   const mereBalance = parseFloat(user?.mereBalance || "0");
   const usdtBalance = parseFloat(user?.usdtBalance || "0");
   const withdrawAmountUsdt = parseFloat(withdrawAmount) || 0;
-  const withdrawFee = withdrawAmountUsdt * 0.02; // 2% fee
+  const withdrawFee = withdrawAmountUsdt * (WITHDRAWAL_FEE_PERCENT / 100);
   const withdrawTotal = withdrawAmountUsdt - withdrawFee;
 
   return (
@@ -301,11 +309,17 @@ export default function Wallet() {
                     </div>
 
                     <div className="text-right">
-                      <div className={`font-bold ${getTransactionColor(tx.type)}`}>
-                        {tx.type === "withdrawal" || tx.type === "purchase" ? "-" : "+"}
-                        {formatMERE(tx.amountMere)} MERE
-                      </div>
-                      {tx.amountUsd && (
+                      {tx.type === 'deposit' && tx.amountUsd ? (
+                        <div className={`font-bold ${getTransactionColor(tx.type)}`}>
+                          +{parseFloat(tx.amountUsd).toFixed(2)} USDT
+                        </div>
+                      ) : (
+                        <div className={`font-bold ${getTransactionColor(tx.type)}`}>
+                          {tx.type === "withdrawal" || tx.type === "purchase" ? "-" : "+"}
+                          {formatMERE(tx.amountMere)}
+                        </div>
+                      )}
+                      {tx.type !== 'deposit' && tx.amountUsd && (
                         <div className="text-sm text-muted-foreground">
                           {parseFloat(tx.amountUsd).toFixed(2)} USDT
                         </div>
@@ -334,7 +348,7 @@ export default function Wallet() {
           <DialogHeader>
             <DialogTitle>Deposit USDT (TRC-20)</DialogTitle>
             <DialogDescription>
-              Send USDT to this address to add funds to your wallet
+              Send USDT (TRC-20) to your personal address. Deposits are credited to your USDT balance; you can convert to MERE anytime.
             </DialogDescription>
           </DialogHeader>
 
@@ -344,27 +358,24 @@ export default function Wallet() {
                 <strong>Important:</strong> Only send USDT (TRC-20) to this address. Other tokens will be lost.
               </div>
               <div className="text-sm text-muted-foreground">
-                <strong>Exchange Rate:</strong> 1 USDT = {(1 / MERE_TO_USD_RATE).toFixed(0)} MERE (1 MERE = {MERE_TO_USD_RATE.toFixed(2)} USDT)
+                <strong>Auto-credit:</strong> Deposits sent to <span className="font-semibold">your personal USDT(TRC-20) address</span> are credited automatically to your USDT balance.
+              </div>
+              <div className="text-sm text-muted-foreground mt-2">
+                <strong>Optional:</strong> Convert between USDT and MERE anytime using the Convert tab. (1 MERE = {MERE_TO_USD_RATE.toFixed(2)} USDT)
               </div>
             </Card>
 
+            {/* Per-user deposit model; no separate sender link required */}
+
             {depositAddress ? (
               <>
-                <div className="bg-white p-4 rounded-lg">
-                  <div className="w-full aspect-square bg-white rounded-lg flex items-center justify-center">
-                    <div className="text-xs font-mono break-all text-center p-4 text-black">
-                      {depositAddress}
-                    </div>
-                  </div>
-                </div>
-
                 <div className="space-y-2">
-                  <div className="text-sm font-medium">USDT(TRC-20) Address</div>
+                  <div className="text-sm font-medium">USDT(TRC-20) Deposit Address</div>
                   <div className="flex gap-2">
                     <Input
                       value={depositAddress}
                       readOnly
-                      className="font-mono text-sm"
+                      className="font-mono text-xs"
                       data-testid="input-deposit-address"
                     />
                     <Button
@@ -372,9 +383,13 @@ export default function Wallet() {
                       size="icon"
                       onClick={handleCopyAddress}
                       data-testid="button-copy-address"
+                      title="Copy address"
                     >
                       {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    This is your personal USDT(TRC-20) deposit address. We auto-credit deposits to your USDT wallet.
                   </div>
                 </div>
 
@@ -382,10 +397,10 @@ export default function Wallet() {
                   <div className="text-sm">
                     <div className="font-semibold mb-2">Next Steps:</div>
                     <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-                      <li>Copy the address above</li>
-                      <li>Send USDT (TRC-20) from your wallet</li>
-                      <li>Wait for blockchain confirmations (usually 1-2 minutes)</li>
-                      <li>Your MERE balance will be updated automatically</li>
+                      <li>Copy your personal deposit address</li>
+                      <li>Send USDT (TRC-20) from your linked wallet</li>
+                      <li>Wait 1–2 minutes for confirmations</li>
+                      <li>We’ll credit USDT automatically; convert to MERE anytime</li>
                     </ol>
                   </div>
                 </Card>
@@ -449,7 +464,7 @@ export default function Wallet() {
                   <span>{withdrawAmountUsdt.toFixed(2)} USDT</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Fee (2%):</span>
+                  <span className="text-muted-foreground">Fee ({WITHDRAWAL_FEE_PERCENT}%):</span>
                   <span className="text-status-busy">-{withdrawFee.toFixed(2)} USDT</span>
                 </div>
                 <div className="flex justify-between text-sm pt-2 border-t border-border">
@@ -511,7 +526,7 @@ export default function Wallet() {
                   data-testid="input-convert-amount-mere"
                 />
                 <div className="text-xs text-muted-foreground mt-1">
-                  Available: {formatMERE(mereBalance)} MERE
+                  Available: {formatMERE(mereBalance)}
                 </div>
               </div>
 
@@ -519,7 +534,7 @@ export default function Wallet() {
                 <Card className="p-4 space-y-2 bg-accent/20">
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Convert:</span>
-                    <span>{formatMERE(parseFloat(convertAmount))} MERE</span>
+                    <span>{formatMERE(parseFloat(convertAmount))}</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="text-muted-foreground">Exchange Rate:</span>
@@ -566,7 +581,7 @@ export default function Wallet() {
                     <span className="font-semibold">You will receive:</span>
                     <div className="text-right">
                       <div className="font-bold text-primary">
-                        {formatMERE(usdToMERE(parseFloat(convertAmount)))} MERE
+                        {formatMERE(usdToMERE(parseFloat(convertAmount)))}
                       </div>
                     </div>
                   </div>

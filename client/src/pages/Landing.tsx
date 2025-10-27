@@ -2,8 +2,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Zap, TrendingUp, Trophy, Star } from "lucide-react";
 import minerImage1 from "@assets/generated_images/Gold_accent_mining_rig_f7e3dcd1.png";
+import { useLocation } from "wouter";
 
 export default function Landing() {
+  const [, setLocation] = useLocation();
   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/10">
       {/* Hero Section */}
@@ -31,7 +33,7 @@ export default function Landing() {
                 <Button
                   size="lg"
                   className="w-full sm:w-auto text-lg px-8 py-6 bg-gold-gradient hover:opacity-90 text-black font-bold"
-                  onClick={() => window.location.href = "/signup"}
+                  onClick={() => setLocation("/signup")}
                   data-testid="button-signup"
                 >
                   Sign Up
@@ -40,7 +42,7 @@ export default function Landing() {
                   size="lg"
                   variant="outline"
                   className="w-full sm:w-auto text-lg px-8 py-6"
-                  onClick={() => window.location.href = "/signin"}
+                  onClick={() => setLocation("/signin")}
                   data-testid="button-signin"
                 >
                   Sign In

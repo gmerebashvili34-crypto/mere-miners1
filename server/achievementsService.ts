@@ -98,7 +98,9 @@ export class AchievementsService {
       .from(userMiners)
       .where(and(
         eq(userMiners.userId, userId),
-        eq(userMiners.isActive, true)
+        eq(userMiners.isActive, true),
+        // Count only real, paid miners (exclude temporary trial miners)
+        eq(userMiners.isTemporary, false as any)
       ));
 
     const totalMinersOwned = minersCountResult?.count || 0;
@@ -110,6 +112,8 @@ export class AchievementsService {
       .where(and(
         eq(userMiners.userId, userId),
         eq(userMiners.isActive, true),
+        // Only real miners
+        eq(userMiners.isTemporary, false as any),
         sql`${userMiners.slotPosition} IS NOT NULL`
       ));
 
@@ -120,6 +124,8 @@ export class AchievementsService {
       where: (userMiners, { and, eq, isNotNull }) => and(
         eq(userMiners.userId, userId),
         eq(userMiners.isActive, true),
+        // Only real miners contribute to hashrate for achievements
+        eq(userMiners.isTemporary, false as any),
         isNotNull(userMiners.slotPosition)
       ),
       with: {

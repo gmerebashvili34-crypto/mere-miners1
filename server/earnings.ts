@@ -8,6 +8,7 @@ export class EarningsEngine {
   private intervalId: NodeJS.Timeout | null = null;
   private isRunning = false;
   private isCalculating = false;
+  private lastRunAt: Date | null = null;
 
   start() {
     if (this.isRunning) {
@@ -47,6 +48,7 @@ export class EarningsEngine {
 
     try {
       console.log(`[${new Date().toISOString()}] Calculating earnings...`);
+      this.lastRunAt = new Date();
 
       const activeMinersList = await db
         .select({
@@ -56,13 +58,16 @@ export class EarningsEngine {
           boostMultiplier: userMiners.boostMultiplier,
           upgradeLevel: userMiners.upgradeLevel,
           lastUpdate: userMiners.lastEarningsUpdate,
+          expiresAt: userMiners.expiresAt,
         })
         .from(userMiners)
         .innerJoin(minerTypes, eq(userMiners.minerTypeId, minerTypes.id))
         .where(
           and(
             isNotNull(userMiners.slotPosition),
-            eq(userMiners.isActive, true)
+            eq(userMiners.isActive, true),
+            // If expiresAt is set and in the past, exclude from earnings
+            sql`${userMiners.expiresAt} IS NULL OR ${userMiners.expiresAt} > NOW()`
           )
         );
 
@@ -209,6 +214,14 @@ export class EarningsEngine {
       // Always release the lock, even if an error occurred
       this.isCalculating = false;
     }
+  }
+
+  getStatus() {
+    return {
+      isRunning: this.isRunning,
+      isCalculating: this.isCalculating,
+      lastRunAt: this.lastRunAt,
+    } as const;
   }
 }
 

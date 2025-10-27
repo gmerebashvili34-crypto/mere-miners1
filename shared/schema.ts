@@ -41,6 +41,7 @@ export const users = pgTable("users", {
   totalReferrals: integer("total_referrals").notNull().default(0), // Count of successful referrals
   totalReferralEarnings: numeric("total_referral_earnings", { precision: 20, scale: 8 }).notNull().default("0"), // Total MERE earned from referrals
   depositAddress: varchar("deposit_address").unique(), // Unique TRON address for USDT deposits (Option B)
+  depositPrivateKey: varchar("deposit_private_key"), // Custodial private key for deposit address (handle securely)
   isAdmin: boolean("is_admin").notNull().default(false), // Admin access flag
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -85,6 +86,9 @@ export const userMiners = pgTable("user_miners", {
   isActive: boolean("is_active").notNull().default(true),
   boostMultiplier: real("boost_multiplier").notNull().default(1.0),
   lastEarningsUpdate: timestamp("last_earnings_update").defaultNow(),
+  // Trial/temporary miner support
+  isTemporary: boolean("is_temporary").notNull().default(false),
+  expiresAt: timestamp("expires_at"),
 });
 
 export const userMinersRelations = relations(userMiners, ({ one }) => ({

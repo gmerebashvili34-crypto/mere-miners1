@@ -80,9 +80,9 @@ export async function signIn(email: string, password: string) {
     throw new Error("Invalid email or password");
   }
 
-  // Check if user has password (Replit Auth users don't)
+  // Ensure account has a password set
   if (!user.passwordHash) {
-    throw new Error("This account uses Replit Auth. Please log in with Replit.");
+    throw new Error("This account does not have a password set.");
   }
 
   // Verify password
@@ -95,14 +95,10 @@ export async function signIn(email: string, password: string) {
   return user;
 }
 
-// Helper to get user ID from either session or Replit Auth
+// Helper to get user ID from session
 export function getUserId(req: Request): string | null {
-  if (req.session?.userId) {
-    return req.session.userId;
-  }
-  if (req.user?.claims?.sub) {
-    return req.user.claims.sub;
-  }
+  const sessionUserId = (req.session as any)?.userId;
+  if (sessionUserId) return sessionUserId;
   return null;
 }
 

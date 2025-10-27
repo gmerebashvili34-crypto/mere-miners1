@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ export default function MiningRoom() {
   const { toast } = useToast();
   const [showMinerSelector, setShowMinerSelector] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [, setLocation] = useLocation();
+  const [showTrialBanner, setShowTrialBanner] = useState(false);
 
   // Fetch user's miners
   const { data: userMiners = [], isLoading: isLoadingMiners } = useQuery<(UserMiner & { minerType: MinerType })[]>({
@@ -40,6 +43,17 @@ export default function MiningRoom() {
   // Get placed miners
   const placedMiners = userMiners.filter(m => m.slotPosition !== null);
   const unplacedMiners = userMiners.filter(m => m.slotPosition === null);
+  const hasTrialMiner = userMiners.some(m => m.isTemporary);
+
+  // Show one-time banner for trial miner; persist dismissal per user
+  useEffect(() => {
+    if (!user?.id) return;
+    const key = `trialBannerDismissed:${user.id}`;
+    const dismissed = localStorage.getItem(key) === '1';
+    if (hasTrialMiner && !dismissed) {
+      setShowTrialBanner(true);
+    }
+  }, [user?.id, hasTrialMiner]);
 
   // Calculate total stats (including upgrade multipliers)
   const totalHashrate = placedMiners.reduce((sum, m) => {
@@ -176,7 +190,7 @@ export default function MiningRoom() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => window.location.href = "/wallet"}
+              onClick={() => setLocation("/wallet")}
               className="gap-2"
               data-testid="button-wallet"
             >
@@ -221,6 +235,30 @@ export default function MiningRoom() {
 
       {/* Mining Slots Grid */}
       <div className="container mx-auto px-4 py-6">
+        {showTrialBanner && (
+          <Card className="p-4 mb-4 border-primary/30 bg-gradient-to-br from-card to-accent/10">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-display font-bold text-foreground">Your 1‑Week Starter Trial Miner is active</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  We auto-placed a 1 TH/s trial miner in your mining room for 7 days. Trial miners cannot be upgraded.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (user?.id) {
+                    localStorage.setItem(`trialBannerDismissed:${user.id}`, '1');
+                  }
+                  setShowTrialBanner(false);
+                }}
+              >
+                Got it
+              </Button>
+            </div>
+          </Card>
+        )}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
           {Array.from({ length: totalSlots }).map((_, index) => {
             const slotNumber = index + 1;
@@ -262,7 +300,7 @@ export default function MiningRoom() {
               Visit the shop to buy your first miner and start earning MERE!
             </p>
             <Button
-              onClick={() => window.location.href = "/shop"}
+              onClick={() => setLocation("/shop")}
               className="bg-gold-gradient text-black font-bold"
               data-testid="button-goto-shop"
             >

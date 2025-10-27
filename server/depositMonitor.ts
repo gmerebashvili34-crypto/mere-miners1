@@ -1,13 +1,14 @@
-import { tronService } from './tronService';
+import { tronService, tronEnabled } from './tronService';
 import { storage } from './storage';
 import { db } from './db';
-import { transactions } from '@shared/schema';
-import { eq, desc } from 'drizzle-orm';
+import { transactions, users } from '@shared/schema';
+import { eq, desc, sql, isNotNull } from 'drizzle-orm';
+import { MIN_DEPOSIT_USDT } from '@shared/constants';
 
 class DepositMonitor {
   private isRunning: boolean = false;
   private pollInterval: number = 30000; // Poll every 30 seconds
-  private lastProcessedTxId: string | undefined;
+  private lastProcessedTxId: string | undefined; // legacy (platform wallet mode)
   private intervalId: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -45,14 +46,19 @@ class DepositMonitor {
       return;
     }
 
+    if (!tronEnabled) {
+      console.warn('⚠️ Skipping deposit monitor start: Tron service disabled');
+      return;
+    }
+
     console.log('🚀 Starting deposit monitor...');
     this.isRunning = true;
 
     // Load last processed transaction ID from database (for idempotency)
     await this.loadLastProcessedTxId();
 
-    // Check immediately on start
-    this.checkForDeposits();
+  // Check immediately on start
+  this.checkForDeposits();
 
     // Then check every 30 seconds
     this.intervalId = setInterval(() => {
@@ -103,15 +109,19 @@ class DepositMonitor {
    */
   private async checkForDeposits() {
     try {
-      const deposits = await tronService.getNewDeposits(this.lastProcessedTxId);
+      // Fetch all users with assigned deposit addresses
+      const usersWithAddresses = await db
+        .select()
+        .from(users)
+        .where(isNotNull(users.depositAddress));
 
-      if (deposits.length === 0) {
-        return;
-      }
+      for (const u of usersWithAddresses) {
+        const deposits = await tronService.getNewDepositsForAddress(u.depositAddress!);
+        if (!deposits || deposits.length === 0) continue;
 
-      console.log(`💎 Found ${deposits.length} new deposit(s)`);
+        console.log(`💎 Found ${deposits.length} new deposit(s) for ${u.id}`);
 
-      for (const deposit of deposits) {
+        for (const deposit of deposits) {
         try {
           // Check for duplicate transaction hash (idempotency guard)
           const exists = await this.txHashExists(deposit.txId);
@@ -120,45 +130,54 @@ class DepositMonitor {
             continue;
           }
 
-          // Convert USDT to MERE (1 MERE = 0.5 USDT, so USDT * 2 = MERE)
-          const mereAmount = deposit.amount * 2;
+          // Minimum deposit guard
+          if (deposit.amount < MIN_DEPOSIT_USDT) {
+            console.log(`ℹ️ Ignoring small deposit ${deposit.amount} USDT < ${MIN_DEPOSIT_USDT}`);
+            continue;
+          }
 
-          console.log(`📥 Processing deposit: ${deposit.amount} USDT (${mereAmount} MERE) from ${deposit.from}`);
+          // Credit USDT directly to user's USDT balance; conversion is optional in-app
+          const usdtAmount = deposit.amount;
+
+          console.log(`📥 Processing deposit: ${usdtAmount} USDT from ${deposit.from}`);
           console.log(`   TX: ${deposit.txId}`);
 
-          // Since we're using Option A (single platform wallet),
-          // we need to manually identify which user made the deposit
-          // For now, we'll store this as a pending deposit that needs manual assignment
-          // In a production system, you'd either:
-          // 1. Generate unique addresses per user (Option B)
-          // 2. Have users register their sending address before depositing
-          // 3. Use a deposit code system
+          // For per-user addresses, credit the owner of the address (u)
+          const user = u;
+          if (user) {
+            // Credit user USDT balance and record transaction atomically
+            await db.transaction(async (tx) => {
+              await tx
+                .update(users)
+                .set({
+                  usdtBalance: sql`${users.usdtBalance} + ${usdtAmount}`,
+                  updatedAt: new Date(),
+                } as any)
+                .where(eq(users.id, user.id));
 
-          // For this implementation, we'll create a transaction record as "pending"
-          // The admin can then assign it to the correct user
-          await storage.createTransaction({
-            userId: 'system', // System user for unassigned deposits
-            type: 'deposit',
-            amountMere: mereAmount.toString(),
-            amountUsd: deposit.amount.toString(),
-            description: `Pending deposit from ${deposit.from}`,
-            status: 'pending',
-            txHash: deposit.txId,
-          });
+              await tx
+                .insert(transactions)
+                .values({
+                  userId: user.id,
+                  type: 'deposit',
+                  amountMere: '0',
+                  amountUsd: usdtAmount.toString(),
+                  description: `USDT deposit credited (${usdtAmount} USDT)`,
+                  status: 'completed',
+                  txHash: deposit.txId,
+                  metadata: { from: deposit.from, to: deposit.to },
+                });
+            });
 
-          console.log(`✅ Deposit recorded as pending (needs manual assignment)`);
-          console.log(`   To credit a user: Update transaction and credit ${mereAmount} MERE`);
-          
+            console.log(`✅ Credited ${usdtAmount} USDT to user ${user.id} (from ${deposit.from})`);
+          } else {
+            console.log(`🕵️ No user linked to sender address ${deposit.from}. Skipping credit.`);
+          }
         } catch (error) {
           console.error(`❌ Error processing deposit ${deposit.txId}:`, error);
         }
-      }
+        }
 
-      // Update last processed transaction ID to the newest one
-      // TronGrid API returns transactions in reverse chronological order (newest first)
-      // so deposits[0] is the most recent transaction
-      if (deposits.length > 0) {
-        this.lastProcessedTxId = deposits[0].txId;
       }
 
     } catch (error) {

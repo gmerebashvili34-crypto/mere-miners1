@@ -1,9 +1,11 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import path from "path";
 import { earningsEngine } from "./earnings";
 import { depositMonitor } from "./depositMonitor";
+import { startJobs } from "./jobs/scheduler";
 
 const app = express();
 
@@ -73,21 +75,33 @@ app.use((req, res, next) => {
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
+  // Other ports are firewalled. Default to 3000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, async () => {
+  const port = parseInt(process.env.PORT || '3000', 10);
+  // Use a simple listen signature for cross-platform compatibility (Windows doesn't support reusePort)
+  server.listen(port, "0.0.0.0", async () => {
     log(`serving on port ${port}`);
     
     // Start earnings engine after server is listening
     earningsEngine.start();
     
-    // Start deposit monitor for automatic USDT deposit detection
-    await depositMonitor.start();
+    // Start legacy deposit monitor only if explicitly enabled
+    try {
+      if (process.env.LEGACY_DEPOSIT_MONITOR === 'true') {
+        await depositMonitor.start();
+      } else {
+        console.log('[deposits] Skipping legacy deposit monitor; using USDT jobs module');
+      }
+    } catch (err) {
+      console.error('Deposit monitor failed to start (continuing):', err);
+    }
+
+    // Start USDT jobs (deposit scanner and withdraw worker)
+    try {
+      startJobs();
+    } catch (err) {
+      console.error('USDT jobs failed to start (continuing):', err);
+    }
   });
 })();

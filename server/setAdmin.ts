@@ -1,3 +1,4 @@
+import 'dotenv/config';
 // Utility script to set a user as admin
 // Usage: npx tsx server/setAdmin.ts <email>
 import { db } from "./db";

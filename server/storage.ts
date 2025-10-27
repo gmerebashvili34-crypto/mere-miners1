@@ -1,4 +1,4 @@
-// Database storage implementation for MereMiners
+// Database storage implementation for MereMiners (Supabase PostgreSQL)
 import {
   users,
   minerTypes,
@@ -31,11 +31,13 @@ import { nanoid } from "nanoid";
 
 // Interface for storage operations
 export interface IStorage {
-  // User operations (required for Replit Auth)
+  // User operations
   getUser(id: string): Promise<User | undefined>;
   getUserByReferralCode(referralCode: string): Promise<User | undefined>;
+  getUserByDepositAddress(address: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amountMere: string, operation: "add" | "subtract"): Promise<void>;
+  setUserDepositAddress(userId: string, address: string): Promise<void>;
   incrementReferralCount(userId: string): Promise<void>;
   
   // Miner Type operations
@@ -90,7 +92,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
-    // Generate referral code if not provided
     const referralCode = userData.referralCode || `MERE${nanoid(6).toUpperCase()}`;
     
     const [user] = await db
@@ -113,6 +114,11 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
+  async getUserByDepositAddress(address: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.depositAddress, address));
+    return user;
+  }
+
   async updateUserBalance(userId: string, amountMere: string, operation: "add" | "subtract"): Promise<void> {
     const amount = parseFloat(amountMere);
     if (operation === "add") {
@@ -132,6 +138,13 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(users.id, userId));
     }
+  }
+
+  async setUserDepositAddress(userId: string, address: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ depositAddress: address, updatedAt: new Date() })
+      .where(eq(users.id, userId));
   }
 
   async incrementReferralCount(userId: string): Promise<void> {
@@ -203,7 +216,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upgradeMiner(minerId: string, userId: string): Promise<{ newLevel: number; cost: number }> {
-    // Get the miner with its type
     const result = await db
       .select()
       .from(userMiners)
@@ -217,13 +229,13 @@ export class DatabaseStorage implements IStorage {
 
     const miner = result[0].user_miners;
     const minerType = result[0].miner_types;
-
+    // Block upgrades for trial/temporary miners
+    if (miner.isTemporary) {
+      throw new Error("Trial miners cannot be upgraded");
+    }
     const currentLevel = miner.upgradeLevel;
-
-    // Flat upgrade cost: $12.99 USD = 25.98 MERE for all miners
     const upgradeCost = 25.98;
 
-    // Check if user has enough balance
     const [user] = await db.select().from(users).where(eq(users.id, userId));
     if (!user) {
       throw new Error("User not found");
@@ -234,17 +246,14 @@ export class DatabaseStorage implements IStorage {
       throw new Error(`Insufficient balance. Need ${upgradeCost.toFixed(2)} MERE`);
     }
 
-    // Deduct cost from user balance
     await this.updateUserBalance(userId, upgradeCost.toFixed(2), "subtract");
 
-    // Upgrade the miner
     const newLevel = currentLevel + 1;
     await db
       .update(userMiners)
       .set({ upgradeLevel: newLevel })
       .where(eq(userMiners.id, minerId));
 
-    // Create transaction record
     await this.createTransaction({
       userId,
       type: "purchase",
@@ -319,12 +328,7 @@ export class DatabaseStorage implements IStorage {
     const [pass] = await db
       .select()
       .from(userSeasonPass)
-      .where(
-        and(
-          eq(userSeasonPass.userId, userId),
-          eq(userSeasonPass.seasonId, seasonId)
-        )
-      );
+      .where(and(eq(userSeasonPass.userId, userId), eq(userSeasonPass.seasonId, seasonId)));
     return pass;
   }
 
@@ -349,12 +353,7 @@ export class DatabaseStorage implements IStorage {
         currentTier: tier,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(userSeasonPass.userId, userId),
-          eq(userSeasonPass.seasonId, seasonId)
-        )
-      );
+      .where(and(eq(userSeasonPass.userId, userId), eq(userSeasonPass.seasonId, seasonId)));
   }
 
   async upgradeSeasonPass(userId: string, seasonId: string): Promise<void> {
@@ -364,31 +363,18 @@ export class DatabaseStorage implements IStorage {
         hasPremium: true,
         updatedAt: new Date(),
       })
-      .where(
-        and(
-          eq(userSeasonPass.userId, userId),
-          eq(userSeasonPass.seasonId, seasonId)
-        )
-      );
+      .where(and(eq(userSeasonPass.userId, userId), eq(userSeasonPass.seasonId, seasonId)));
   }
 
   async claimSeasonPassReward(userId: string, seasonId: string, rewardId: string): Promise<void> {
     const [pass] = await db
       .select()
       .from(userSeasonPass)
-      .where(
-        and(
-          eq(userSeasonPass.userId, userId),
-          eq(userSeasonPass.seasonId, seasonId)
-        )
-      );
+      .where(and(eq(userSeasonPass.userId, userId), eq(userSeasonPass.seasonId, seasonId)));
     
     if (!pass) throw new Error("Season pass not found");
     
-    // Ensure claimedRewards is always an array (Drizzle converts jsonb to JS array)
-    const claimed = Array.isArray(pass.claimedRewards) 
-      ? (pass.claimedRewards as string[]) 
-      : [];
+    const claimed = Array.isArray(pass.claimedRewards) ? (pass.claimedRewards as string[]) : [];
     
     if (!claimed.includes(rewardId)) {
       claimed.push(rewardId);
@@ -398,12 +384,7 @@ export class DatabaseStorage implements IStorage {
           claimedRewards: claimed,
           updatedAt: new Date(),
         })
-        .where(
-          and(
-            eq(userSeasonPass.userId, userId),
-            eq(userSeasonPass.seasonId, seasonId)
-          )
-        );
+        .where(and(eq(userSeasonPass.userId, userId), eq(userSeasonPass.seasonId, seasonId)));
     }
   }
 
@@ -417,13 +398,10 @@ export class DatabaseStorage implements IStorage {
 
   // Slot operations
   async unlockSlot(userId: string): Promise<{ newSlotCount: number }> {
-    // This is simplified - in production you'd track this per user
-    // For now, we'll just return success
     return { newSlotCount: 10 };
   }
 
   async getUserSlotCount(userId: string): Promise<number> {
-    // Default slot count - could be extended to track per user
     return 6;
   }
 
@@ -432,12 +410,7 @@ export class DatabaseStorage implements IStorage {
     const [game] = await db
       .select()
       .from(dailyGames)
-      .where(
-        and(
-          eq(dailyGames.userId, userId),
-          eq(dailyGames.gameType, gameType)
-        )
-      )
+      .where(and(eq(dailyGames.userId, userId), eq(dailyGames.gameType, gameType)))
       .orderBy(desc(dailyGames.lastPlayedAt))
       .limit(1);
     return game;
@@ -447,21 +420,14 @@ export class DatabaseStorage implements IStorage {
     const games = await db
       .select({ id: dailyGames.id })
       .from(dailyGames)
-      .where(
-        and(
-          eq(dailyGames.userId, userId),
-          eq(dailyGames.gameType, gameType)
-        )
-      )
+      .where(and(eq(dailyGames.userId, userId), eq(dailyGames.gameType, gameType)))
       .limit(1);
     return games.length > 0;
   }
 
   async playDailyGame(userId: string, gameType: string, rewardMere: string, metadata?: any): Promise<DailyGame> {
-    // Credit the user with reward MERE
     await this.updateUserBalance(userId, rewardMere, "add");
     
-    // Record the game play
     const [game] = await db
       .insert(dailyGames)
       .values({

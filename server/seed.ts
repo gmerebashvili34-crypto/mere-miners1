@@ -1,4 +1,5 @@
 // Seed data for MereMiners
+import 'dotenv/config';
 import { db } from "./db";
 import { minerTypes, seasons, seasonPassRewards, achievements } from "@shared/schema";
 

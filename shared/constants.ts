@@ -7,6 +7,9 @@ export const TH_DAILY_YIELD_MERE = 0.16; // Daily yield per 1 TH/s in MERE
 export const DEFAULT_SLOTS = 6; // Default number of mining slots
 export const SLOT_EXPANSION_PRICE_MERE = 50; // Cost to unlock one additional slot
 export const REFERRAL_BONUS_PERCENT = 10; // Referrer earns 10% of referee's mining earnings
+export const WITHDRAWAL_FEE_PERCENT = 2; // 2% fee on USDT withdrawals
+export const MIN_WITHDRAW_USDT = 1; // Minimum withdrawal amount in USDT
+export const MIN_DEPOSIT_USDT = 1; // Minimum deposit amount in USDT to consider
 
 // Formatting helpers
 export function formatMERE(amount: number | string): string {

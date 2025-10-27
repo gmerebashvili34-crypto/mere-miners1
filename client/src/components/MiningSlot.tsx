@@ -86,6 +86,8 @@ export function MiningSlot({
   // Flat upgrade cost: $12.99 USD = 25.98 MERE for all miners (unlimited upgrades)
   const upgradeCost = 25.98;
 
+  const isTrial = Boolean((miner as any)?.isTemporary);
+
   return (
     <>
       <Card className="relative aspect-square overflow-hidden border-card-border bg-gradient-to-br from-card to-accent/10 hover-elevate group flex flex-col">
@@ -163,11 +165,13 @@ export function MiningSlot({
           {onUpgradeMiner && (
             <Button
               onClick={() => onUpgradeMiner(miner.id)}
-              className="w-full bg-gold-gradient text-black font-bold text-xs flex items-center justify-center gap-1.5"
+              className="w-full bg-gold-gradient text-black font-bold text-xs flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-not-allowed"
               data-testid={`button-upgrade-miner-${miner.id}`}
+              disabled={isTrial}
+              title={isTrial ? "Trial miners cannot be upgraded" : undefined}
             >
               <ArrowUp className="w-4 h-4" />
-              <span>Upgrade ({upgradeCost} MERE)</span>
+              <span>{isTrial ? "Trial - No Upgrade" : `Upgrade (${upgradeCost} MERE)`}</span>
             </Button>
           )}
         </div>

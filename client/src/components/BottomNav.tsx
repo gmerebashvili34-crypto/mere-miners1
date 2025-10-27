@@ -5,7 +5,7 @@ export function BottomNav() {
   const [location] = useLocation();
 
   const navItems = [
-    { icon: Home, label: "Mine", path: "/", testId: "nav-mining" },
+    { icon: Home, label: "Mine", path: "/home", testId: "nav-mining" },
     { icon: ShoppingBag, label: "Shop", path: "/shop", testId: "nav-shop" },
     { icon: Gamepad2, label: "Games", path: "/games", testId: "nav-games" },
     { icon: Trophy, label: "Ranks", path: "/leaderboard", testId: "nav-leaderboard" },
