@@ -7,7 +7,6 @@ export function BottomNav() {
   const navItems = [
     { icon: Home, label: "Mine", path: "/home", testId: "nav-mining" },
     { icon: ShoppingBag, label: "Shop", path: "/shop", testId: "nav-shop" },
-    { icon: Gamepad2, label: "Games", path: "/games", testId: "nav-games" },
     { icon: Trophy, label: "Ranks", path: "/leaderboard", testId: "nav-leaderboard" },
     { icon: Star, label: "Pass", path: "/season-pass", testId: "nav-season-pass" },
     { icon: User, label: "Profile", path: "/profile", testId: "nav-profile" },

@@ -130,14 +130,15 @@ export default function Shop() {
 
       {/* Shop Grid */}
       <div className="container mx-auto px-4 py-6">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 items-stretch">
           {miners.map((miner) => (
-            <MinerCard
-              key={miner.id}
-              miner={miner}
-              onPurchase={handlePurchase}
-              isPurchasing={purchaseMutation.isPending && selectedMiner?.id === miner.id}
-            />
+            <div key={miner.id} className="h-full">
+              <MinerCard
+                miner={miner}
+                onPurchase={handlePurchase}
+                isPurchasing={purchaseMutation.isPending && selectedMiner?.id === miner.id}
+              />
+            </div>
           ))}
         </div>
 

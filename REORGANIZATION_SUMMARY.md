@@ -155,3 +155,4 @@ await storage.createUserMiner(userMinerData);
 - All unnecessary duplicate code has been removed
 - Type checking passes successfully
 - Ready for deployment
+

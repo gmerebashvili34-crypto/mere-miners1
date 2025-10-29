@@ -26,9 +26,9 @@ import {
   type DailyGame,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { DEFAULT_SLOTS } from "@shared/constants";
+import { eq, and, desc, sql, count } from "drizzle-orm";
 import { nanoid } from "nanoid";
-
 // Interface for storage operations
 export interface IStorage {
   // User operations
@@ -80,6 +80,7 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  private slotCounts = new Map<string, number>();
   // User operations
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -130,13 +131,18 @@ export class DatabaseStorage implements IStorage {
         })
         .where(eq(users.id, userId));
     } else {
-      await db
+      // Safety: prevent negative balances using an atomic conditional update
+      const result = await db
         .update(users)
         .set({
           mereBalance: sql`${users.mereBalance} - ${amount}`,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userId));
+        .where(and(eq(users.id, userId), sql`${users.mereBalance} >= ${amount}`))
+        .returning();
+      if ((result as any[]).length === 0) {
+        throw new Error("Insufficient MERE balance");
+      }
     }
   }
 
@@ -181,7 +187,8 @@ export class DatabaseStorage implements IStorage {
       .where(eq(userMiners.userId, userId))
       .orderBy(desc(userMiners.purchasedAt));
     
-    return result.map(row => ({
+    const rows = result as Array<{ user_miners: UserMiner; miner_types: MinerType }>;
+    return rows.map((row) => ({
       ...row.user_miners,
       minerType: row.miner_types,
     }));
@@ -302,7 +309,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(leaderboardEntries.totalMined))
       .limit(limit);
     
-    return result.map((row, index) => ({
+    const rowsLb = result as Array<{ leaderboard_entries: LeaderboardEntry; users: User }>;
+    return rowsLb.map((row, index: number) => ({
       ...row.leaderboard_entries,
       rank: index + 1,
       user: row.users,
@@ -396,13 +404,28 @@ export class DatabaseStorage implements IStorage {
       .orderBy(seasonPassRewards.tier);
   }
 
-  // Slot operations
+  // Slot operations (persisted via transactions count)
   async unlockSlot(userId: string): Promise<{ newSlotCount: number }> {
-    return { newSlotCount: 10 };
+    const current = await this.getUserSlotCount(userId);
+    const maxAllowed = DEFAULT_SLOTS + 8;
+    const next = Math.min(current + 1, maxAllowed);
+    // The transaction recording happens in the route; we return the target count immediately
+    return { newSlotCount: next };
   }
 
   async getUserSlotCount(userId: string): Promise<number> {
-    return 6;
+    // Count only v3 unlock transactions to establish a fresh baseline (ignoring any previous markers)
+    const [row] = await db
+      .select({ c: count() })
+      .from(transactions)
+      .where(and(
+        eq(transactions.userId, userId),
+        eq(transactions.type, "purchase"),
+        eq(transactions.status, "completed"),
+        eq(transactions.description, "Unlocked mining slot v3"),
+      ));
+    const extra = Math.min(Number(row?.c || 0), 8);
+    return DEFAULT_SLOTS + extra;
   }
 
   // Daily Games operations
@@ -444,3 +467,4 @@ export class DatabaseStorage implements IStorage {
 }
 
 export const storage = new DatabaseStorage();
+

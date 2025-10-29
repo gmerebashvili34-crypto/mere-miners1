@@ -16,17 +16,27 @@ export default function SeasonPass() {
   const { toast } = useToast();
 
   // Fetch season pass data
-  const { data: userPass } = useQuery<UserSeasonPass & { 
+  const { data: userPass, isLoading: isLoadingPass } = useQuery<UserSeasonPass & { 
     rewards: SeasonPassReward[];
     seasonName: string;
   }>({
     queryKey: ["/api/season-pass"],
+    // Keep current data visible during refetches so the grid doesn't disappear
+    placeholderData: (prev) => prev as any,
   });
 
   // Upgrade to premium mutation
   const upgradeMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/season-pass/upgrade", {});
+    },
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/season-pass"] });
+      const prev = queryClient.getQueryData<UserSeasonPass & { rewards: SeasonPassReward[]; seasonName: string }>(["/api/season-pass"]);
+      if (prev && !prev.hasPremium) {
+        queryClient.setQueryData(["/api/season-pass"], { ...prev, hasPremium: true });
+      }
+      return { prev };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/season-pass"] });
@@ -36,7 +46,8 @@ export default function SeasonPass() {
         description: "You now have access to premium rewards",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/season-pass"], ctx.prev);
       toast({
         title: "Upgrade Failed",
         description: error.message,
@@ -50,6 +61,16 @@ export default function SeasonPass() {
     mutationFn: async (rewardId: string) => {
       await apiRequest("POST", "/api/season-pass/claim", { rewardId });
     },
+    onMutate: async (rewardId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/season-pass"] });
+      const prev = queryClient.getQueryData<UserSeasonPass & { rewards: SeasonPassReward[]; seasonName: string }>(["/api/season-pass"]);
+      if (prev) {
+        const claimed = Array.isArray(prev.claimedRewards) ? [...(prev.claimedRewards as any)] : [];
+        if (!claimed.includes(rewardId)) claimed.push(rewardId);
+        queryClient.setQueryData(["/api/season-pass"], { ...prev, claimedRewards: claimed });
+      }
+      return { prev };
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/season-pass"] });
       toast({
@@ -57,7 +78,8 @@ export default function SeasonPass() {
         description: "The reward has been added to your account",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["/api/season-pass"], ctx.prev);
       toast({
         title: "Claim Failed",
         description: error.message,
@@ -119,6 +141,19 @@ export default function SeasonPass() {
       </div>
 
       <div className="container mx-auto px-4 py-6 space-y-6">
+        {isLoadingPass && (
+          <Card className="p-6 mb-4">
+            <div className="animate-pulse space-y-3">
+              <div className="h-6 w-44 bg-muted rounded" />
+              <div className="h-3 w-full bg-muted rounded" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-2">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <div key={i} className="h-28 bg-muted rounded" />
+                ))}
+              </div>
+            </div>
+          </Card>
+        )}
         {/* Progress Overview */}
         <Card className="p-6 bg-gradient-to-br from-card to-primary/10 border-primary/30">
           <div className="flex items-center justify-between mb-4">

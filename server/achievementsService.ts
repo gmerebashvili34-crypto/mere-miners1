@@ -1,6 +1,7 @@
 import { db } from "./db";
-import { users, userMiners, achievements, userAchievements, transactions, userSeasonPass } from "@shared/schema";
-import { eq, and, sql, count } from "drizzle-orm";
+import { users, userMiners, achievements, userAchievements, transactions, userSeasonPass, minerTypes } from "@shared/schema";
+import type { UserAchievement } from "@shared/schema";
+import { eq, and, sql, count, isNotNull, gte } from "drizzle-orm";
 
 interface AchievementCheckContext {
   userId: string;
@@ -22,10 +23,10 @@ export class AchievementsService {
     const userAchievementRecords = await db
       .select()
       .from(userAchievements)
-      .where(eq(userAchievements.userId, userId));
+      .where(eq(userAchievements.userId, userId)) as UserAchievement[];
 
-    const userAchievementsMap = new Map(
-      userAchievementRecords.map((ua) => [ua.achievementId, ua])
+    const userAchievementsMap = new Map<string, UserAchievement>(
+      userAchievementRecords.map((ua: UserAchievement) => [ua.achievementId, ua])
     );
 
     // Calculate current stats for the user
@@ -35,46 +36,48 @@ export class AchievementsService {
 
     for (const achievement of allAchievements) {
       const userAchievement = userAchievementsMap.get(achievement.id);
-      
-      // Skip if already unlocked
+
+      // Skip if already unlocked (as of our initial read)
       if (userAchievement?.isUnlocked) continue;
 
       const criteria = achievement.criteria as { type: string; value: number };
-      
+
       // Check if achievement criteria is met
       const progress = this.getProgressForCriteria(criteria.type, stats);
-      const isUnlocked = progress >= criteria.value;
+      const meetsCriteria = progress >= criteria.value;
 
       if (userAchievement) {
-        // Update existing record
-        if (progress !== userAchievement.progress || isUnlocked) {
+        // Always keep progress up to date
+        if (progress !== userAchievement.progress) {
           await db
             .update(userAchievements)
-            .set({
-              progress,
-              isUnlocked,
-              unlockedAt: isUnlocked ? new Date() : userAchievement.unlockedAt,
-            })
+            .set({ progress })
             .where(eq(userAchievements.id, userAchievement.id));
+        }
 
-          if (isUnlocked && !userAchievement.isUnlocked) {
-            newlyUnlocked.push(achievement.id);
-            await this.awardAchievement(userId, achievement);
-          }
+        // If criteria met, try to atomically flip is_unlocked from false -> true and award exactly once
+        if (meetsCriteria) {
+          const justUnlocked = await this.tryUnlockAndAward(userId, achievement.id, achievement);
+          if (justUnlocked) newlyUnlocked.push(achievement.id);
         }
       } else {
-        // Create new achievement tracking record
-        await db.insert(userAchievements).values({
-          userId,
-          achievementId: achievement.id,
-          progress,
-          isUnlocked,
-          unlockedAt: isUnlocked ? new Date() : null,
-        });
+        // No record yet. Create a tracking record first (locked), then try to unlock atomically if criteria is met.
+        // Note: We intentionally create as locked to avoid double-award on concurrent inserts.
+        try {
+          await db.insert(userAchievements).values({
+            userId,
+            achievementId: achievement.id,
+            progress,
+            isUnlocked: false,
+            unlockedAt: null,
+          });
+        } catch (e) {
+          // If another concurrent process inserted, ignore
+        }
 
-        if (isUnlocked) {
-          newlyUnlocked.push(achievement.id);
-          await this.awardAchievement(userId, achievement);
+        if (meetsCriteria) {
+          const justUnlocked = await this.tryUnlockAndAward(userId, achievement.id, achievement);
+          if (justUnlocked) newlyUnlocked.push(achievement.id);
         }
       }
     }
@@ -88,9 +91,7 @@ export class AchievementsService {
 
   private async getUserStats(userId: string) {
     // Get user data
-    const user = await db.query.users.findFirst({
-      where: (users, { eq }) => eq(users.id, userId),
-    });
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
 
     // Count total miners owned
     const [minersCountResult] = await db
@@ -119,23 +120,23 @@ export class AchievementsService {
 
     const minersPlaced = placedMinersResult?.count || 0;
 
-    // Calculate total hashrate
-    const placedMiners = await db.query.userMiners.findMany({
-      where: (userMiners, { and, eq, isNotNull }) => and(
+    // Calculate total hashrate using explicit join to minerTypes
+    const minerRows = await db
+      .select({ thRate: minerTypes.thRate, boostMultiplier: userMiners.boostMultiplier })
+      .from(userMiners)
+      .innerJoin(minerTypes, eq(userMiners.minerTypeId, minerTypes.id))
+      .where(and(
         eq(userMiners.userId, userId),
         eq(userMiners.isActive, true),
         // Only real miners contribute to hashrate for achievements
         eq(userMiners.isTemporary, false as any),
         isNotNull(userMiners.slotPosition)
-      ),
-      with: {
-        minerType: true,
-      },
-    });
+      ));
 
-    const totalHashrate = placedMiners.reduce((sum, miner) => {
-      return sum + (miner.minerType.thRate * (miner.boostMultiplier || 1.0));
-    }, 0);
+    const totalHashrate = (minerRows as Array<{ thRate: number; boostMultiplier: number | null }>).reduce(
+      (sum: number, row) => sum + row.thRate * (row.boostMultiplier || 1.0),
+      0
+    );
 
     // Count total purchases (transactions of type "purchase")
     const [purchasesResult] = await db
@@ -149,9 +150,7 @@ export class AchievementsService {
     const totalPurchases = purchasesResult?.count || 0;
 
     // Check premium pass status
-    const seasonPass = await db.query.userSeasonPass.findFirst({
-      where: (pass, { eq }) => eq(pass.userId, userId),
-    });
+  const [seasonPass] = await db.select().from(userSeasonPass).where(eq(userSeasonPass.userId, userId)).limit(1);
 
     const hasPremiumPass = seasonPass?.hasPremium ? 1 : 0;
 
@@ -198,34 +197,57 @@ export class AchievementsService {
     }
   }
 
-  private async awardAchievement(userId: string, achievement: any) {
+  // Attempt to flip is_unlocked=false -> true atomically and award once. Returns true only for the first successful flip.
+  private async tryUnlockAndAward(userId: string, achievementId: string, achievement: any): Promise<boolean> {
     const rewardAmount = parseFloat(achievement.rewardMere || "0");
-    
-    if (rewardAmount > 0) {
-      await db.transaction(async (tx) => {
-        // Credit MERE reward
-        await tx
-          .update(users)
-          .set({
-            mereBalance: sql`${users.mereBalance} + ${rewardAmount}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(users.id, userId));
 
-        // Create transaction record
-        await tx.insert(transactions).values({
-          userId,
-          type: "reward",
-          amountMere: rewardAmount.toString(),
-          amountUsd: (rewardAmount * 0.5).toFixed(2),
-          description: `Achievement unlocked: ${achievement.name}`,
-          status: "completed",
-          metadata: { achievementId: achievement.id },
-        });
-      });
+    let unlockedNow = false;
 
+  await db.transaction(async (tx: any) => {
+      // Atomically unlock only if currently locked
+      const updated = await tx
+        .update(userAchievements)
+        .set({ isUnlocked: true, unlockedAt: new Date() })
+        .where(and(
+          eq(userAchievements.userId, userId),
+          eq(userAchievements.achievementId, achievementId),
+          eq(userAchievements.isUnlocked, false as any)
+        ))
+        .returning({ id: userAchievements.id });
+
+      if (updated.length > 0) {
+        unlockedNow = true;
+
+        // Credit reward only for the first process that flipped the flag
+        if (rewardAmount > 0) {
+          // Credit MERE reward
+          await tx
+            .update(users)
+            .set({
+              mereBalance: sql`${users.mereBalance} + ${rewardAmount}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(users.id, userId));
+
+          // Create transaction record
+          await tx.insert(transactions).values({
+            userId,
+            type: "reward",
+            amountMere: rewardAmount.toString(),
+            amountUsd: (rewardAmount * 0.5).toFixed(2),
+            description: `Achievement unlocked: ${achievement.name}`,
+            status: "completed",
+            metadata: { achievementId },
+          });
+        }
+      }
+    });
+
+    if (unlockedNow && rewardAmount > 0) {
       console.log(`🏆 Achievement unlocked for user ${userId}: ${achievement.name} (${rewardAmount} MERE reward)`);
     }
+
+    return unlockedNow;
   }
 }
 

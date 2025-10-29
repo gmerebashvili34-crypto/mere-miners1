@@ -13,6 +13,7 @@
     "db:push": "drizzle-kit push",
     "db:sanity": "tsx server/tools/dbSanity.ts",
     "db:tron": "tsx server/tools/dbApplyTronUSDT.ts",
+    "db:idx:achievements": "tsx server/tools/addUserAchievementUniqueIndex.ts",
     "admin:grant": "tsx server/setAdmin.ts"
   },
   "dependencies": {

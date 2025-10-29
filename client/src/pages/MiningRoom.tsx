@@ -7,7 +7,7 @@ import { MiningSlot } from "@/components/MiningSlot";
 import { BottomNav } from "@/components/BottomNav";
 import { Wallet, Zap, TrendingUp, Clock, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { formatMERE, formatUSD, mereToUSD, TH_DAILY_YIELD_MERE, DEFAULT_SLOTS, SLOT_EXPANSION_PRICE_MERE } from "@/lib/constants";
+import { formatMERE, formatUSD, mereToUSD, TH_DAILY_YIELD_MERE, DEFAULT_SLOTS, SLOT_EXPANSION_PRICE_MERE, MAX_SLOTS } from "@/lib/constants";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { UserMiner, MinerType } from "@shared/schema";
@@ -37,8 +37,8 @@ export default function MiningRoom() {
   const { data: slotsInfo } = useQuery<{ totalSlots: number; unlockedSlots: number }>({
     queryKey: ["/api/mining/slots"],
   });
-
-  const totalSlots = slotsInfo?.unlockedSlots || DEFAULT_SLOTS;
+  // Number of currently usable slots (unlocked). The grid still renders up to MAX_SLOTS with locked tiles.
+  const unlockedSlots = slotsInfo?.unlockedSlots ?? DEFAULT_SLOTS;
 
   // Get placed miners
   const placedMiners = userMiners.filter(m => m.slotPosition !== null);
@@ -61,27 +61,44 @@ export default function MiningRoom() {
     return sum + m.minerType.thRate * m.boostMultiplier * upgradeMultiplier;
   }, 0);
   const totalDailyEarnings = totalHashrate * TH_DAILY_YIELD_MERE;
+  const canAffordUnlock = (() => {
+    const bal = parseFloat(String(user?.mereBalance ?? '0'));
+    return bal >= SLOT_EXPANSION_PRICE_MERE;
+  })();
 
   // Place miner mutation
   const placeMinerMutation = useMutation({
     mutationFn: async ({ minerId, slotPosition }: { minerId: string; slotPosition: number }) => {
       await apiRequest("POST", "/api/mining/place", { minerId, slotPosition });
     },
+    onMutate: async (vars: { minerId: string; slotPosition: number }) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/mining/room"] });
+      const previous = queryClient.getQueryData<(UserMiner & { minerType: MinerType })[]>(["/api/mining/room"]);
+      if (previous) {
+        const optimistic = previous.map((m) =>
+          m.id === vars.minerId ? { ...m, slotPosition: vars.slotPosition } : m
+        );
+        queryClient.setQueryData(["/api/mining/room"], optimistic);
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["/api/mining/room"], ctx.previous);
+      toast({
+        title: "Couldn’t place miner",
+        description: "Please try again.",
+      });
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mining/room"] });
       setShowMinerSelector(false);
       setSelectedSlot(null);
       toast({
-        title: "Miner Placed",
-        description: "Your miner is now actively mining MERE!",
+        title: "Miner placed",
+        description: "Now mining MERE.",
       });
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mining/room"] });
     },
   });
 
@@ -90,12 +107,24 @@ export default function MiningRoom() {
     mutationFn: async (minerId: string) => {
       await apiRequest("POST", "/api/mining/remove", { minerId });
     },
-    onSuccess: () => {
+    onMutate: async (minerId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["/api/mining/room"] });
+      const previous = queryClient.getQueryData<(UserMiner & { minerType: MinerType })[]>(["/api/mining/room"]);
+      if (previous) {
+        const optimistic = previous.map((m) =>
+          m.id === minerId ? { ...m, slotPosition: null } : m
+        );
+        queryClient.setQueryData(["/api/mining/room"], optimistic);
+      }
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["/api/mining/room"], ctx.previous);
+      toast({ title: "Couldn’t remove miner", description: "Please retry." });
+    },
+    // No success toast needed
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/mining/room"] });
-      toast({
-        title: "Miner Removed",
-        description: "Miner removed from mining room",
-      });
     },
   });
 
@@ -115,9 +144,8 @@ export default function MiningRoom() {
     },
     onError: (error: Error) => {
       toast({
-        title: "Upgrade Failed",
+        title: "Upgrade failed",
         description: error.message,
-        variant: "destructive",
       });
     },
   });
@@ -127,29 +155,35 @@ export default function MiningRoom() {
     mutationFn: async () => {
       await apiRequest("POST", "/api/mining/unlock-slot", {});
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/mining/slots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      toast({
-        title: "Slot Unlocked",
-        description: "New mining slot is now available!",
-      });
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ["/api/mining/slots"] });
+      const previous = queryClient.getQueryData<{ totalSlots: number; unlockedSlots: number }>(["/api/mining/slots"]);
+      if (previous) {
+        queryClient.setQueryData(["/api/mining/slots"], {
+          ...previous,
+          unlockedSlots: Math.min(previous.unlockedSlots + 1, MAX_SLOTS),
+        });
+      }
+      return { previous };
     },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.previous) queryClient.setQueryData(["/api/mining/slots"], ctx.previous);
+      toast({ title: "Couldn’t unlock slot", description: "Check balance and try again." });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Slot unlocked", description: "You can place another miner." });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/mining/slots"] });
     },
   });
 
   const handleAddMinerToSlot = (slotNumber: number) => {
     if (unplacedMiners.length === 0) {
       toast({
-        title: "No Miners Available",
-        description: "Buy miners from the shop first!",
-        variant: "destructive",
+        title: "No miners available",
+        description: "Go to Shop to buy one first.",
       });
       return;
     }
@@ -226,7 +260,7 @@ export default function MiningRoom() {
                 <span className="text-xs text-muted-foreground">Active</span>
               </div>
               <div className="font-display font-bold text-lg text-foreground" data-testid="text-active-miners">
-                {placedMiners.length}/{totalSlots}
+                {placedMiners.length}/{unlockedSlots}
               </div>
             </Card>
           </div>
@@ -259,8 +293,8 @@ export default function MiningRoom() {
             </div>
           </Card>
         )}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-6">
-          {Array.from({ length: totalSlots }).map((_, index) => {
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 mb-6">
+          {Array.from({ length: unlockedSlots }).map((_, index) => {
             const slotNumber = index + 1;
             const miner = getMinerInSlot(slotNumber);
             return (
@@ -276,13 +310,22 @@ export default function MiningRoom() {
             );
           })}
           
-          {/* Locked slots */}
-          {Array.from({ length: Math.max(0, 3 - (totalSlots - DEFAULT_SLOTS)) }).map((_, index) => (
+          {/* Locked slots: show remaining purchasable slots up to MAX_SLOTS */}
+          {Array.from({ length: Math.max(0, MAX_SLOTS - unlockedSlots) }).map((_, index) => (
             <MiningSlot
               key={`locked-${index}`}
-              slotNumber={totalSlots + index + 1}
+              slotNumber={unlockedSlots + index + 1}
               isLocked
-              onUnlock={() => unlockSlotMutation.mutate()}
+              onUnlock={() => {
+                if (!canAffordUnlock) {
+                  toast({ title: `Need ${SLOT_EXPANSION_PRICE_MERE} MERE`, description: 'Deposit or earn more to unlock a slot.' });
+                  return;
+                }
+                if (!unlockSlotMutation.isPending) {
+                  unlockSlotMutation.mutate();
+                }
+              }}
+              unlockDisabled={unlockSlotMutation.isPending || !canAffordUnlock}
             />
           ))}
         </div>

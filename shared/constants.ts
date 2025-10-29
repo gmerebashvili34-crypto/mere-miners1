@@ -4,7 +4,8 @@
 export const MERE_TO_USD_RATE = 0.5; // 1 MERE = $0.50 USD
 export const TH_BASE_PRICE_MERE = 27.98; // Base price per 1 TH/s in MERE
 export const TH_DAILY_YIELD_MERE = 0.16; // Daily yield per 1 TH/s in MERE
-export const DEFAULT_SLOTS = 6; // Default number of mining slots
+export const DEFAULT_SLOTS = 2; // Free mining slots
+export const MAX_SLOTS = 10; // Total slots (2 free + 8 purchasable)
 export const SLOT_EXPANSION_PRICE_MERE = 50; // Cost to unlock one additional slot
 export const REFERRAL_BONUS_PERCENT = 10; // Referrer earns 10% of referee's mining earnings
 export const WITHDRAWAL_FEE_PERCENT = 2; // 2% fee on USDT withdrawals

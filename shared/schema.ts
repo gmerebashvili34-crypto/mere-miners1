@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import {
   index,
+  uniqueIndex,
   integer,
   jsonb,
   numeric,
@@ -254,15 +255,19 @@ export const achievementsRelations = relations(achievements, ({ many }) => ({
 export type Achievement = typeof achievements.$inferSelect;
 
 // User achievements (unlocked achievements)
-export const userAchievements = pgTable("user_achievements", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  achievementId: varchar("achievement_id").notNull().references(() => achievements.id, { onDelete: "cascade" }),
-  progress: real("progress").notNull().default(0), // Current progress towards achievement (can be decimal for total_mined, hashrate, etc.)
-  isUnlocked: boolean("is_unlocked").notNull().default(false),
-  unlockedAt: timestamp("unlocked_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
+export const userAchievements = pgTable(
+  "user_achievements",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    achievementId: varchar("achievement_id").notNull().references(() => achievements.id, { onDelete: "cascade" }),
+    progress: real("progress").notNull().default(0), // Current progress towards achievement (can be decimal for total_mined, hashrate, etc.)
+    isUnlocked: boolean("is_unlocked").notNull().default(false),
+    unlockedAt: timestamp("unlocked_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [uniqueIndex("uq_user_achievement").on(table.userId, table.achievementId)]
+);
 
 export const userAchievementsRelations = relations(userAchievements, ({ one }) => ({
   user: one(users, {

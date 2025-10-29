@@ -2,9 +2,10 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./auth";
-import { calculateDiscountedPrice, TH_DAILY_YIELD_MERE, SLOT_EXPANSION_PRICE_MERE, WITHDRAWAL_FEE_PERCENT, MIN_WITHDRAW_USDT } from "@shared/constants";
+import { calculateDiscountedPrice, TH_DAILY_YIELD_MERE, SLOT_EXPANSION_PRICE_MERE, WITHDRAWAL_FEE_PERCENT, MIN_WITHDRAW_USDT, DEFAULT_SLOTS, MAX_SLOTS } from "@shared/constants";
 import { db } from "./db";
 import { achievements, userAchievements, users, minerTypes, userMiners, transactions, seasons, seasonPassRewards } from "@shared/schema";
+import type { Achievement as TAchievement, UserAchievement as TUserAchievement } from "@shared/schema";
 import { eq, sum, count, sql, isNotNull, and } from "drizzle-orm";
 import { achievementsService } from "./achievementsService";
 import { getReferralStats } from "./referralService";
@@ -450,7 +451,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = requireUserId(req, res);
       if (!userId) return;
-      const miners = await storage.getUserMiners(userId);
+      let miners = await storage.getUserMiners(userId);
+      // Safety net: ensure there's always an active 1 TH/s trial miner for users without one
+      const now = new Date();
+      const hasActiveTrial = miners.some((m: any) => Boolean(m.isTemporary) && (!m.expiresAt || new Date(m.expiresAt) > now));
+      if (!hasActiveTrial) {
+        try {
+          const expires = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          let oneThMiner = (await storage.getMinerTypes()).find((m) => m.thRate === 1.0) || null;
+          if (!oneThMiner) {
+            oneThMiner = await storage.createMinerType({
+              name: "Starter Trial Miner",
+              description: "1 TH/s trial miner for new users (7 days)",
+              imageUrl: "/attached_assets/generated_images/Black_Background_Cube_Miner_c9e82d6a.png",
+              thRate: 1.0,
+              basePriceUsd: "0.00",
+              basePriceMere: "0.00",
+              dailyYieldUsd: "0.08",
+              dailyYieldMere: "0.16",
+              roiDays: 7,
+              rarity: "common",
+              isAvailable: false,
+            });
+          }
+          // Find first free slot up to MAX_SLOTS; if none, add to inventory (slotPosition: null)
+          const used = new Set<number>();
+          for (const m of miners as any[]) {
+            if (m.slotPosition != null) used.add(Number(m.slotPosition));
+          }
+          let placeAt: number | null = null;
+          for (let s = 1; s <= MAX_SLOTS; s++) {
+            if (!used.has(s)) { placeAt = s; break; }
+          }
+          await storage.createUserMiner({
+            userId,
+            minerTypeId: oneThMiner.id,
+            slotPosition: placeAt,
+            isActive: true,
+            boostMultiplier: 1.0,
+            upgradeLevel: 0,
+            isTemporary: true as any,
+            expiresAt: expires as any,
+          } as any);
+          miners = await storage.getUserMiners(userId);
+        } catch (e) {
+          // Non-fatal: if ensure fails, continue returning current miners
+          console.warn('[mining-room] ensure trial miner failed:', (e as any)?.message || e);
+        }
+      }
       res.json(miners);
     } catch (error) {
       console.error("Error fetching mining room:", error);
@@ -462,8 +510,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = requireUserId(req, res);
       if (!userId) return;
-      const slotCount = await storage.getUserSlotCount(userId);
-      res.json({ totalSlots: 20, unlockedSlots: slotCount });
+  const slotCount = await storage.getUserSlotCount(userId);
+  // Return canonical caps to the client: MAX_SLOTS governs grid size, unlockedSlots is how many are usable now
+  res.json({ totalSlots: MAX_SLOTS, unlockedSlots: slotCount });
     } catch (error) {
       console.error("Error fetching slots:", error);
       res.status(500).json({ message: "Failed to fetch slots" });
@@ -550,25 +599,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = requireUserId(req, res);
       if (!userId) return;
 
+      // Prevent unlocking more than eight extra slots (DEFAULT_SLOTS + 8)
+      const currentSlots = await storage.getUserSlotCount(userId);
+      if (currentSlots >= DEFAULT_SLOTS + 8) {
+        return res.status(400).json({ message: 'All extra slots are already unlocked' });
+      }
+
       // Check user balance
       const user = await storage.getUser(userId);
       if (!user || parseFloat(user.mereBalance) < SLOT_EXPANSION_PRICE_MERE) {
         return res.status(400).json({ message: "Insufficient MERE balance" });
       }
 
-      // Deduct cost
-      await storage.updateUserBalance(userId, SLOT_EXPANSION_PRICE_MERE.toString(), "subtract");
+      // Deduct cost (atomic; throws if insufficient)
+      try {
+        await storage.updateUserBalance(userId, SLOT_EXPANSION_PRICE_MERE.toString(), "subtract");
+      } catch (e: any) {
+        return res.status(400).json({ message: e?.message || 'Insufficient MERE balance' });
+      }
 
       // Unlock slot (simplified - in production track per user)
       const result = await storage.unlockSlot(userId);
 
-      // Record transaction
+      // Record transaction (v3 marker to reset baseline cleanly)
       await storage.createTransaction({
         userId,
         type: "purchase",
         amountMere: SLOT_EXPANSION_PRICE_MERE.toString(),
         amountUsd: (SLOT_EXPANSION_PRICE_MERE * 0.5).toString(),
-        description: "Unlocked mining slot",
+        description: "Unlocked mining slot v3",
         status: "completed",
       });
 
@@ -811,7 +870,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description = `Converted ${convertAmount} MERE to ${convertedAmount.toFixed(2)} USDT`;
         
         // Actually deduct MERE and add USDT
-        await db.transaction(async (tx) => {
+  await db.transaction(async (tx: any) => {
           // Deduct MERE (with balance check to prevent negative balance)
           const result = await tx
             .update(users)
@@ -847,7 +906,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         description = `Converted ${convertAmount} USDT to ${convertedAmount.toFixed(2)} MERE`;
         
         // Actually deduct USDT and add MERE
-        await db.transaction(async (tx) => {
+  await db.transaction(async (tx: any) => {
           // Deduct USDT (with balance check to prevent negative balance)
           const result = await tx
             .update(users)
@@ -1107,11 +1166,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!userId) return;
       
       // Get all achievements with user progress
-      const allAchievements = await db.select().from(achievements).where(eq(achievements.isActive, true));
-      const userAchievementRecords = await db.select().from(userAchievements).where(eq(userAchievements.userId, userId));
+      const allAchievements = await db.select().from(achievements).where(eq(achievements.isActive, true)) as TAchievement[];
+      const userAchievementRecords = await db.select().from(userAchievements).where(eq(userAchievements.userId, userId)) as TUserAchievement[];
       
-      const achievementsWithProgress = allAchievements.map(ach => {
-        const userAch = userAchievementRecords.find(ua => ua.achievementId === ach.id);
+      const achievementsWithProgress = allAchievements.map((ach: TAchievement) => {
+        const userAch = userAchievementRecords.find((ua: TUserAchievement) => ua.achievementId === ach.id);
         return {
           ...ach,
           progress: userAch?.progress || 0,

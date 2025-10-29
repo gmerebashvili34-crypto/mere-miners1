@@ -1,8 +1,9 @@
 import { db } from "./db";
-import { users, userMiners, transactions, leaderboardEntries, minerTypes } from "@shared/schema";
-import { eq, and, isNotNull, sql } from "drizzle-orm";
+import { users, userMiners, transactions, leaderboardEntries, minerTypes, seasons } from "@shared/schema";
+import { eq, and, isNotNull, sql, gte } from "drizzle-orm";
 import { TH_DAILY_YIELD_MERE } from "@shared/constants";
 import { creditReferralBonus } from "./referralService";
+import { achievementsService } from "./achievementsService";
 
 export class EarningsEngine {
   private intervalId: NodeJS.Timeout | null = null;
@@ -110,7 +111,7 @@ export class EarningsEngine {
         const roundedEarnings = Math.floor(totalEarnings * 100000000) / 100000000;
 
         try {
-          await db.transaction(async (tx) => {
+          await db.transaction(async (tx: any) => {
             // Update user balance and total mined
             await tx
               .update(users)
@@ -125,14 +126,17 @@ export class EarningsEngine {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            const todayTransaction = await tx.query.transactions.findFirst({
-              where: (txns, { and, eq, gte }) =>
+            const [todayTransaction] = await tx
+              .select()
+              .from(transactions)
+              .where(
                 and(
-                  eq(txns.userId, userId),
-                  eq(txns.type, "earnings"),
-                  gte(txns.createdAt, today)
-                ),
-            });
+                  eq(transactions.userId, userId),
+                  eq(transactions.type, "earnings"),
+                  gte(transactions.createdAt, today)
+                )
+              )
+              .limit(1);
 
             if (todayTransaction) {
               // Update existing daily transaction
@@ -156,18 +160,18 @@ export class EarningsEngine {
             }
 
             // Update leaderboard
-            const activeSeasons = await tx.query.seasons.findFirst({
-              where: (seasons, { eq }) => eq(seasons.isActive, true),
-            });
+            const [activeSeasons] = await tx
+              .select()
+              .from(seasons)
+              .where(eq(seasons.isActive, true))
+              .limit(1);
 
             if (activeSeasons) {
-              const entry = await tx.query.leaderboardEntries.findFirst({
-                where: (entries, { and, eq }) =>
-                  and(
-                    eq(entries.userId, userId),
-                    eq(entries.seasonId, activeSeasons.id)
-                  ),
-              });
+              const [entry] = await tx
+                .select()
+                .from(leaderboardEntries)
+                .where(and(eq(leaderboardEntries.userId, userId), eq(leaderboardEntries.seasonId, activeSeasons.id)))
+                .limit(1);
 
               if (entry) {
                 await tx
@@ -201,6 +205,9 @@ export class EarningsEngine {
 
           // Credit referral bonus to referrer (if applicable)
           await creditReferralBonus(userId, roundedEarnings);
+
+          // Check and unlock any earnings-based achievements idempotently
+          await achievementsService.checkAndUnlockAchievements({ userId, type: "earnings" });
         } catch (error) {
           console.error(`❌ Failed to credit earnings for user ${userId}:`, error);
           // If transaction fails, lastEarningsUpdate is NOT updated, so earnings will be retried next cycle

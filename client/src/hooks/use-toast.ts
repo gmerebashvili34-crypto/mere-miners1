@@ -5,8 +5,10 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+// Keep a small queue and auto-dismiss quickly to reduce UI friction
+const TOAST_LIMIT = 2
+const TOAST_REMOVE_DELAY = 3200
+const DEFAULT_DURATION = 3000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -155,6 +157,8 @@ function toast({ ...props }: Toast) {
       ...props,
       id,
       open: true,
+      // Default duration so toasts auto-dismiss quickly unless overridden
+      duration: (props as any)?.duration ?? DEFAULT_DURATION,
       onOpenChange: (open) => {
         if (!open) dismiss()
       },

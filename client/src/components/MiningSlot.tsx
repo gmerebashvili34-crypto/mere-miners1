@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,10 @@ interface MiningSlotProps {
   isEmpty?: boolean;
   isLocked?: boolean;
   onUnlock?: () => void;
+  unlockDisabled?: boolean;
 }
 
-export function MiningSlot({ 
+function MiningSlotComponent({ 
   slotNumber, 
   miner, 
   onAddMiner, 
@@ -35,7 +36,8 @@ export function MiningSlot({
   onUpgradeMiner,
   isEmpty = true,
   isLocked = false,
-  onUnlock 
+  onUnlock,
+  unlockDisabled = false,
 }: MiningSlotProps) {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   if (isLocked) {
@@ -50,7 +52,8 @@ export function MiningSlot({
           {onUnlock && (
             <Button 
               size="sm" 
-              onClick={onUnlock}
+              onClick={unlockDisabled ? undefined : onUnlock}
+              disabled={unlockDisabled}
               data-testid={`button-unlock-slot-${slotNumber}`}
             >
               Unlock (50 MERE)
@@ -206,3 +209,5 @@ export function MiningSlot({
   </>
   );
 }
+
+export const MiningSlot = memo(MiningSlotComponent);
