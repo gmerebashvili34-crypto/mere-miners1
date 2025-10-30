@@ -1,2 +1,1 @@
-# Mere.miners
-mining
+
